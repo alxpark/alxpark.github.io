@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<title>Stepcraft 12</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=Michroma&display=swap">
+<style>
+/* Layout: a single instrument chassis — transport strip, pattern library, 12-row step grid, synth piano roll, FX rack. */
+:root {
+  --chassis: #dfe1e3;
+  --panel: #eceeef;
+  --well: #c9ccd0;
+  --ink: #1c1f24;
+  --ink-2: #545a63;
+  --line: #b4b8be;
+  --key-off: #f6f6f4;
+  --key-off-beat: #e4e5e3;
+  --low: #c9432c;
+  --snare: #e2891a;
+  --metal: #d6b62c;
+  --perc: #2a8c86;
+  --synth: #4a5fc1;
+  --now: #1c1f24;
+  --led: #ff4b1f;
+  --font-display: "Michroma", "Eurostile", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chassis: #17191c; --panel: #212429; --well: #0f1113; --ink: #e9e6de; --ink-2: #9aa0a8;
+    --line: #353a41; --key-off: #2c3036; --key-off-beat: #363b42; --low: #e05a40; --snare: #f09a2c;
+    --metal: #e4c745; --perc: #3bb0a8; --synth: #7a8cf0; --now: #f4f1e8; --led: #ff6a3d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --chassis: #17191c; --panel: #212429; --well: #0f1113; --ink: #e9e6de; --ink-2: #9aa0a8;
+  --line: #353a41; --key-off: #2c3036; --key-off-beat: #363b42; --low: #e05a40; --snare: #f09a2c;
+  --metal: #e4c745; --perc: #3bb0a8; --synth: #7a8cf0; --now: #f4f1e8; --led: #ff6a3d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--chassis); color: var(--ink); font-family: var(--font-body); font-size: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 40px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--synth); outline-offset: 2px; }
+.label { font-family: var(--font-display); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+.panel-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.panel-head h2 { font-family: var(--font-display); font-size: 12px; letter-spacing: .18em; text-transform: uppercase; margin: 0; font-weight: 400; }
+.panel-head .hint { color: var(--ink-2); font-size: 12.5px; }
+.spacer { flex: 1; }
+
+/* transport */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+.brand { display: flex; flex-direction: column; gap: 2px; margin-right: 8px; }
+.brand b { font-family: var(--font-display); font-weight: 400; font-size: 20px; letter-spacing: .08em; }
+.brand span { font-size: 11.5px; color: var(--ink-2); letter-spacing: .04em; }
+.transport { display: flex; gap: 8px; }
+.tbtn { width: 52px; height: 44px; border-radius: 5px; border: 1px solid var(--line); background: var(--key-off); display: grid; place-items: center; }
+.tbtn svg { width: 18px; height: 18px; fill: var(--ink); }
+.tbtn.play[aria-pressed="true"] { background: var(--led); border-color: var(--led); }
+.tbtn.play[aria-pressed="true"] svg { fill: #fff; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field input[type=number], .field select { height: 32px; border-radius: 4px; border: 1px solid var(--line); background: var(--key-off); padding: 0 8px; }
+.field input[type=number] { width: 74px; font-family: var(--font-mono); }
+.meter { width: 96px; height: 8px; background: var(--well); border-radius: 4px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--perc), var(--metal) 70%, var(--led)); transition: width 60ms linear; }
+input[type=range] { accent-color: var(--ink); width: 100%; }
+
+/* library */
+.lib { display: grid; grid-template-columns: auto 1fr; gap: 12px 18px; align-items: start; }
+.fams { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.chip { border: 1px solid var(--line); background: var(--key-off); border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.pats { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.pat { border: 1px solid var(--line); background: transparent; border-radius: 4px; padding: 6px 10px; font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.pat small { font-family: var(--font-mono); font-size: 11px; color: var(--ink-2); }
+.pat[aria-current="true"] { border-color: var(--led); box-shadow: inset 0 0 0 1px var(--led); }
+.now-playing { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; color: var(--ink-2); font-size: 13px; }
+.now-playing strong { color: var(--ink); font-weight: 600; font-size: 15px; }
+
+/* step grid */
+.scroll-x { overflow-x: auto; padding-bottom: 4px; }
+.grid { display: grid; gap: 3px; align-items: center; }
+.trk { display: flex; align-items: center; gap: 4px; padding-right: 8px; min-width: 0; position: sticky; left: 0; z-index: 2; background: var(--panel); }
+.trk .name { flex: 1; text-align: left; border: 0; background: transparent; padding: 4px 6px; border-radius: 4px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.trk .name::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--fam); flex: none; }
+.trk .name .src { color: var(--ink-2); font-size: 10.5px; font-family: var(--font-mono); }
+.trk.sel .name { background: var(--key-off); box-shadow: inset 0 0 0 1px var(--line); }
+.ms { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 3px; background: transparent; font-size: 10px; font-family: var(--font-mono); color: var(--ink-2); padding: 0; }
+.ms[aria-pressed="true"].m { background: var(--ink-2); color: var(--panel); }
+.ms[aria-pressed="true"].s { background: var(--metal); color: #1c1f24; border-color: var(--metal); }
+.step { height: 30px; border-radius: 3px; border: 0; background: var(--key-off); padding: 0; position: relative; }
+.step.beat { background: var(--key-off-beat); }
+.step[data-v="1"] { background: color-mix(in srgb, var(--fam) 32%, var(--key-off)); }
+.step[data-v="2"] { background: color-mix(in srgb, var(--fam) 78%, var(--key-off)); }
+.step[data-v="3"] { background: var(--fam); box-shadow: inset 0 -4px 0 color-mix(in srgb, #000 28%, var(--fam)); }
+.step.now::after { content: ""; position: absolute; inset: -2px; border: 2px solid var(--now); border-radius: 4px; pointer-events: none; }
+.ruler { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); text-align: center; }
+.ruler.led { position: relative; height: 12px; }
+.ruler.led::before { content: ""; position: absolute; left: 50%; top: 2px; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: var(--well); }
+.ruler.led.on::before { background: var(--led); box-shadow: 0 0 6px var(--led); }
+.legend { display: flex; gap: 12px; align-items: center; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+.legend i { display: inline-block; width: 14px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; background: var(--low); }
+
+/* inspector */
+.inspector { margin-top: 14px; display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+.insp-id { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.insp-id b { font-size: 17px; font-weight: 600; }
+.insp-id .src { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.sbtn { border: 1px solid var(--line); background: var(--key-off); border-radius: 4px; padding: 6px 10px; font-size: 12.5px; }
+.sbtn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.knobs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px 18px; align-content: start; }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; align-items: baseline; }
+.ctl input { grid-column: 1 / -1; }
+.ctl output { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-2); }
+
+/* synth */
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.tabs button { border: 0; background: var(--key-off); padding: 7px 16px; font-size: 13px; }
+.tabs button[aria-selected="true"] { background: var(--synth); color: #fff; }
+.roll-wrap { display: grid; gap: 3px; }
+.roll-scroll { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--well); }
+.roll { display: grid; gap: 1px; }
+.rk { position: sticky; left: 0; z-index: 1; font-family: var(--font-mono); font-size: 10px; display: flex; align-items: center; padding-left: 6px; height: 14px; background: var(--key-off); color: var(--ink-2); border-right: 1px solid var(--line); }
+.rk.blk { background: var(--key-off-beat); }
+.rk.c { color: var(--ink); font-weight: 500; }
+.rc { height: 14px; background: var(--key-off); border: 0; padding: 0; }
+.rc.blk { background: var(--key-off-beat); }
+.rc.beat { box-shadow: inset 1px 0 0 var(--line); }
+.rc.on { background: var(--synth); }
+.rc.tie { background: color-mix(in srgb, var(--synth) 55%, var(--key-off)); }
+.rc.acc { box-shadow: inset 0 0 0 2px color-mix(in srgb, #fff 55%, var(--synth)); }
+.rc.now { outline: 1px solid var(--now); outline-offset: -1px; }
+.flags { display: grid; gap: 1px; }
+.flag { height: 18px; border: 0; background: var(--key-off); padding: 0; font-size: 9px; font-family: var(--font-mono); color: var(--ink-2); }
+.flag.on { background: var(--ink); color: var(--panel); }
+.flag-name { font-family: var(--font-mono); font-size: 10px; color: var(--ink-2); display: flex; align-items: center; padding-left: 6px; height: 18px; }
+.synth-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 18px; align-items: start; }
+.synth-ctl { display: grid; gap: 14px; }
+.synth-ctl .knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kbd-hint { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+.kbd-hint kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: var(--key-off); }
+
+.fxrack { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px 22px; }
+.status { font-size: 12.5px; color: var(--ink-2); }
+.status.err { color: var(--low); font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 5px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 820px) {
+  .synth-grid, .inspector { grid-template-columns: 1fr; }
+  .brand { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .meter i, .toast { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <section class="panel top" aria-label="Transport">
+    <div class="brand"><b>STEPCRAFT·12</b><span>WebAssembly drum machine · sampler · sequencer · synth</span></div>
+    <div class="transport">
+      <button class="tbtn play" id="play" aria-pressed="false" title="Play / stop (Space)" aria-label="Play"><svg viewBox="0 0 20 20"><path d="M5 3l12 7-12 7z"/></svg></button>
+      <button class="tbtn" id="stop" title="Stop" aria-label="Stop"><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12"/></svg></button>
+    </div>
+    <label class="field"><span class="label">Tempo</span><input type="number" id="bpm" min="30" max="300" step="1" value="120"></label>
+    <label class="field" style="width:120px"><span class="label">Swing <output id="swOut" class="num">0%</output></span><input type="range" id="swing" min="0" max="0.45" step="0.01" value="0"></label>
+    <label class="field"><span class="label">Steps</span><select id="steps"><option>8</option><option>12</option><option selected>16</option><option>24</option><option>32</option><option>48</option><option>64</option></select></label>
+    <label class="field"><span class="label">Grid</span><select id="div"><option value="4">1/16</option><option value="3">1/8 triplet</option><option value="2">1/8</option></select></label>
+    <label class="field" style="width:120px"><span class="label">Master</span><input type="range" id="mvol" min="0" max="1.2" step="0.01" value="0.8"></label>
+    <div class="field"><span class="label">Output</span><div class="meter"><i id="meter"></i></div></div>
+    <span class="status" id="status">Press play to start audio</span>
+  </section>
+
+  <section class="panel" aria-label="Pattern library">
+    <div class="panel-head"><h2>Pattern library</h2><span class="hint" id="libCount"></span><span class="spacer"></span>
+      <button class="sbtn" id="prevPat" aria-label="Previous pattern">◀ Prev</button><button class="sbtn" id="nextPat" aria-label="Next pattern">Next ▶</button></div>
+    <div class="lib">
+      <div class="fams" id="fams" role="group" aria-label="Genre families"></div>
+      <div class="pats" id="pats"></div>
+      <div class="now-playing"><strong id="patName">—</strong><span id="patInfo"></span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Drum sequencer">
+    <div class="panel-head"><h2>Drums</h2>
+      <span class="legend"><span>Click a step:</span><span><i style="opacity:.78"></i>on</span><span><i></i>accent</span><span><i style="opacity:.32"></i>ghost</span><span>right-click clears</span></span>
+      <span class="spacer"></span>
+      <button class="sbtn" id="dblBtn" title="Copy the pattern into a second half">Double length</button>
+      <button class="sbtn" id="clearDrums">Clear drums</button></div>
+    <div class="scroll-x"><div class="grid" id="dgrid"></div></div>
+    <div class="inspector" id="insp"></div>
+  </section>
+
+  <section class="panel" aria-label="Synth">
+    <div class="panel-head"><h2>Synth</h2>
+      <div class="tabs" role="tablist"><button role="tab" id="tabBass" aria-selected="true">Bass</button><button role="tab" id="tabKeys" aria-selected="false">Keys</button></div>
+      <button class="ms m" id="synMute" aria-pressed="false" title="Mute this part">M</button>
+      <span class="hint" id="rollHint"></span><span class="spacer"></span>
+      <button class="sbtn" id="clearSyn">Clear part</button></div>
+    <div class="synth-grid">
+      <div class="roll-wrap" style="min-width:0">
+        <div class="roll-scroll" id="rollScroll"><div class="roll" id="roll"></div></div>
+        <div class="scroll-x" id="flagScroll"><div class="flags" id="flags"></div></div>
+      </div>
+      <div class="synth-ctl">
+        <label class="field"><span class="label">Preset</span><select id="synPreset"></select></label>
+        <div class="knobs" id="synKnobs"></div>
+        <p class="kbd-hint">Play live with <kbd>A</kbd>–<kbd>K</kbd> (white keys) and <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd>; <kbd>Z</kbd>/<kbd>X</kbd> shift octave (<span id="octOut" class="num">C2</span>). Number keys <kbd>1</kbd>–<kbd>0</kbd>, <kbd>-</kbd>, <kbd>=</kbd> hit the 12 drums. <kbd>Space</kbd> plays.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Effects">
+    <div class="panel-head"><h2>Effects &amp; master</h2><span class="hint">Per-track sends live in each track's settings above.</span></div>
+    <div class="fxrack" id="fx"></div>
+  </section>
+</div>
+<input type="file" id="fileIn" accept="audio/*" hidden>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// Shared: track list, parameter map, presets, pattern parser.
+const TRACKS = [
+  {id:'k',  name:'Kick',       fam:'low',   vol:.95, pan:0},
+  {id:'s',  name:'Snare',      fam:'snare', vol:.8,  pan:0,    rev:.08},
+  {id:'c',  name:'Clap',       fam:'snare', vol:.7,  pan:.05,  rev:.12},
+  {id:'h',  name:'Closed Hat', fam:'metal', vol:.55, pan:.15},
+  {id:'o',  name:'Open Hat',   fam:'metal', vol:.5,  pan:.15},
+  {id:'lt', name:'Low Tom',    fam:'low',   vol:.75, pan:-.25},
+  {id:'ht', name:'High Tom',   fam:'low',   vol:.72, pan:.25},
+  {id:'r',  name:'Rim',        fam:'perc',  vol:.6,  pan:-.1},
+  {id:'cb', name:'Cowbell',    fam:'perc',  vol:.45, pan:.3},
+  {id:'sh', name:'Shaker',     fam:'perc',  vol:.45, pan:-.35},
+  {id:'rd', name:'Ride',       fam:'metal', vol:.45, pan:.3},
+  {id:'cr', name:'Crash',      fam:'metal', vol:.5,  pan:-.2},
+];
+const MAXST = 64;
+const PI_ = {
+  dvol:0, dpan:1, dpitch:2, ddec:3, ddly:4, drev:5,
+  b_wave:96, b_sub:97, b_cut:98, b_res:99, b_env:100, b_fdec:101, b_adec:102, b_sus:103, b_rel:104,
+  b_acc:105, b_glide:106, b_drive:107, b_vol:108, b_dly:109, b_rev:110,
+  k_wave:128, k_det:129, k_cut:130, k_res:131, k_env:132, k_a:133, k_d:134, k_s:135, k_r:136,
+  k_vol:137, k_dly:138, k_rev:139,
+  m_bpm:160, m_swing:161, m_steps:162, m_dtime:163, m_dfb:164, m_rsize:165, m_rdamp:166, m_vol:167, m_drive:168, m_div:169,
+};
+const BASS_PRESETS = {
+  acid:  {wave:0,sub:0,  cut:240, res:.84,env:3.4,fdec:.18,adec:1,  sus:1,  rel:.02,acc:.9,glide:.06,drive:.55,vol:.42,dly:.12,rev:0},
+  sub:   {wave:3,sub:0,  cut:900, res:.1, env:.5, fdec:.1, adec:.5, sus:.9, rel:.06,acc:.3,glide:.05,drive:.15,vol:.75,dly:0,rev:0},
+  b808:  {wave:3,sub:0,  cut:1600,res:0,  env:0,  fdec:.1, adec:1.3,sus:0,  rel:.35,acc:.3,glide:.09,drive:.5, vol:.8, dly:0,rev:0},
+  reese: {wave:0,sub:.35,cut:480, res:.35,env:1,  fdec:.3, adec:1,  sus:1,  rel:.1, acc:.4,glide:.08,drive:.45,vol:.42,dly:0,rev:.05},
+  pluck: {wave:1,sub:.25,cut:380, res:.4, env:3,  fdec:.12,adec:.25,sus:.2, rel:.08,acc:.5,glide:.05,drive:.2, vol:.5, dly:.05,rev:0},
+  funk:  {wave:1,sub:.2, cut:600, res:.3, env:2,  fdec:.15,adec:.3, sus:.5, rel:.05,acc:.6,glide:.04,drive:.25,vol:.5, dly:0,rev:0},
+  round: {wave:2,sub:.25,cut:700, res:.1, env:1.2,fdec:.2, adec:.6, sus:.3, rel:.15,acc:.4,glide:.05,drive:.1, vol:.7, dly:0,rev:.05},
+  growl: {wave:0,sub:.4, cut:280, res:.72,env:2.6,fdec:.35,adec:1,  sus:1,  rel:.05,acc:.9,glide:.07,drive:.9, vol:.38,dly:.1,rev:0},
+};
+const KEYS_PRESETS = {
+  pad:   {wave:0,det:14,cut:900, res:.15,env:1.2,a:.4,  d:1.2,s:.7,r:1.2,vol:.32,dly:.2, rev:.55},
+  stab:  {wave:0,det:10,cut:700, res:.35,env:3,  a:.002,d:.18,s:0, r:.12,vol:.45,dly:.3, rev:.3},
+  organ: {wave:1,det:4, cut:2400,res:0,  env:.3, a:.005,d:.1, s:.9,r:.06,vol:.28,dly:.05,rev:.2},
+  ep:    {wave:3,det:6, cut:3000,res:0,  env:0,  a:.002,d:1.2,s:.25,r:.35,vol:.55,dly:.1,rev:.25},
+  pluck: {wave:1,det:8, cut:900, res:.3, env:3,  a:.001,d:.25,s:0, r:.2, vol:.42,dly:.35,rev:.3},
+  lead:  {wave:0,det:8, cut:1400,res:.4, env:1.5,a:.01, d:.3, s:.7,r:.15,vol:.32,dly:.3, rev:.25},
+  brass: {wave:0,det:10,cut:600, res:.2, env:2,  a:.05, d:.4, s:.7,r:.2, vol:.35,dly:.1, rev:.3},
+  power: {wave:1,det:18,cut:1600,res:.2, env:1,  a:.002,d:.5, s:.5,r:.1, vol:.3, dly:0,  rev:.15},
+  bell:  {wave:2,det:3, cut:4000,res:0,  env:0,  a:.001,d:.8, s:0, r:.8, vol:.45,dly:.3, rev:.4},
+};
+const KITS = {
+  std: {},
+  tight: {k:{dec:.55}, h:{dec:.7}, o:{dec:.6}, cr:{dec:.7}},
+  hard:  {k:{vol:1,pitch:2,dec:.6}, _m:{drive:.55}},
+  boom:  {k:{pitch:-5,vol:1,dec:1}, s:{vol:.7,pitch:2}, c:{rev:.15}, h:{dec:.45,vol:.45}},
+  room:  {s:{rev:.22}, lt:{rev:.18}, ht:{rev:.18}, k:{pitch:2,dec:.6}, rd:{vol:.55}, cr:{vol:.5,rev:.15}},
+  big:   {s:{rev:.5,vol:.85}, k:{dec:.7}, lt:{rev:.35}, ht:{rev:.35}, cr:{rev:.3}, _m:{rsize:.9}},
+  dusty: {k:{pitch:-1}, s:{pitch:-2,rev:.08}, h:{dec:.5,vol:.42}, _m:{drive:.35}},
+  lofi:  {k:{pitch:-2,dec:.6}, s:{pitch:-4,vol:.6,rev:.15}, h:{dec:.4,vol:.38,pitch:-3}, r:{pitch:-3}, _m:{drive:.4,rdamp:.7}},
+  dnb:   {s:{pitch:3,vol:.8}, k:{dec:.5}, rd:{vol:.4}},
+  soft:  {k:{vol:.75,dec:.6}, s:{vol:.5,rev:.2}, rd:{vol:.4,rev:.15}, r:{vol:.45,rev:.15}, h:{vol:.4}},
+};
+const MASTER_DEFAULT = {dtime:3, dfb:.35, rsize:.84, rdamp:.3, vol:.8, drive:.12};
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function noteName(n) { return NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1); }
+function noteNum(s) {
+  const m = /^([A-G])([#b]?)(-?\d)$/.exec(s);
+  if (!m) return null;
+  const base = {C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+  return 12 * (+m[3] + 1) + base;
+}
+const QUALS = {maj:[0,4,7], m:[0,3,7], '7':[0,4,7,10], m7:[0,3,7,10], maj7:[0,4,7,11], m9:[0,3,10,14],
+  '9':[0,4,10,14], maj9:[0,4,11,14], sus2:[0,2,7], sus4:[0,5,7], dim:[0,3,6], '5':[0,7,12],
+  '6':[0,4,7,9], m6:[0,3,7,9], add9:[0,4,7,14]};
+const DRUM_CH = {'.':0, g:1, o:2, x:3};
+
+function tokensOf(str) { return str.replace(/\|/g, ' ').trim().split(/\s+/).filter(Boolean); }
+function fitLen(arr, st, what) {
+  if (arr.length === st) return arr;
+  if (!arr.length || st % arr.length) throw new Error(`${what}: length ${arr.length} does not fit ${st} steps`);
+  const out = [];
+  while (out.length < st) out.push(...arr);
+  return out;
+}
+function parseTok(tok, keys, what) {
+  let f = 0;
+  while (/[!~]$/.test(tok)) { if (tok.endsWith('!')) f |= 1; else f |= 2; tok = tok.slice(0, -1); }
+  if (tok === '.') return {n: keys ? [] : 0, f: 0};
+  if (tok === '-') return {n: keys ? [] : 0, f: f | 4};
+  if (keys) {
+    const [root, q] = tok.split(':');
+    const r = noteNum(root);
+    if (r == null) throw new Error(`${what}: bad note "${tok}"`);
+    if (q && !QUALS[q]) throw new Error(`${what}: bad chord "${tok}"`);
+    return {n: q ? QUALS[q].map(i => r + i) : [r], f: f & 1};
+  }
+  const n = noteNum(tok);
+  if (n == null) throw new Error(`${what}: bad note "${tok}"`);
+  return {n, f};
+}
+function parsePattern(p) {
+  const st = p.st || 16;
+  const drum = TRACKS.map(() => new Array(st).fill(0));
+  for (const [id, str] of Object.entries(p.d || {})) {
+    const ti = TRACKS.findIndex(t => t.id === id);
+    if (ti < 0) throw new Error(`${p.n}: unknown track ${id}`);
+    const chars = [...str.replace(/[|\s]/g, '')].map(c => {
+      if (!(c in DRUM_CH)) throw new Error(`${p.n}/${id}: bad char ${c}`);
+      return DRUM_CH[c];
+    });
+    drum[ti] = fitLen(chars, st, `${p.n}/${id}`);
+  }
+  const bass = p.b ? fitLen(tokensOf(p.b), st, `${p.n}/bass`).map(t => parseTok(t, false, p.n)) : new Array(st).fill(0).map(() => ({n:0, f:0}));
+  const keys = p.ky ? fitLen(tokensOf(p.ky), st, `${p.n}/keys`).map(t => parseTok(t, true, p.n)) : new Array(st).fill(0).map(() => ({n:[], f:0}));
+  return {st, div: p.div || 4, bpm: p.bpm, sw: p.sw || 0, drum, bass, keys};
+}
+if (typeof module !== 'undefined') module.exports = {TRACKS, PI_, BASS_PRESETS, KEYS_PRESETS, KITS, parsePattern, noteName, MASTER_DEFAULT};
+
+// Pattern library. Drum rows: x accent, o normal, g ghost, . off ("|" and spaces ignored).
+// Rows shorter than the step count repeat. Bass/keys tokens per step: "." rest, "-" tie,
+// NOTE+OCT (e.g. A1, Eb2), keys chords as NOTE+OCT:quality (A3:m7). Suffix ! accent, ~ slide.
+const PATTERNS = [
+// ───────── House & Disco ─────────
+{n:'Classic House', g:'House & Disco', bpm:124, sw:.06, kit:'tight', bass:'pluck', keys:'organ',
+ info:'Chicago four-on-the-floor with offbeat open hats and organ stabs.',
+ d:{k:'x...|x...|x...|x...', c:'....|o...|....|o...', o:'..o.|..o.|..o.|..o.', sh:'g.og|g.og|g.og|g.og'},
+ b:'. . A1 .|. . A1 .|. . A1 .|. A1 G1 .',
+ ky:'. . A3:m7 .|. . A3:m7 .|. . A3:m7 .|. . G3:maj .'},
+{n:'Deep House', g:'House & Disco', bpm:120, sw:.12, st:32, kit:'std', bass:'sub', keys:'pad',
+ info:'Warm m9 pads, rim ghost notes and a rolling sub line.',
+ d:{k:'x...|x...|x...|x...', c:'....|o...|....|o...', h:'..o.|..o.|..o.|..o.', r:'..g.|...g|.g..|..g.', sh:'.g.g|.g.g|.g.g|.g.g'},
+ b:'D2 . . D2|. . A1 .|. . C2 .|D2 . . .|F1 . . F1|. . C2 .|. . F1 .|E1 . G1 .',
+ ky:'D3:m9 - - -|- - - -|- - - -|- - . .|F3:maj7 - - -|- - - -|- - - -|- - . .'},
+{n:'Tech House', g:'House & Disco', bpm:126, sw:.04, kit:'tight', bass:'sub',
+ info:'Tight kick, syncopated rims and a bouncy 16th bassline.',
+ d:{k:'x...|x...|x...|x...', c:'....|x...|....|x...', h:'..o.|..o.|..o.|..o.', r:'g..o|..g.|...o|.g..', sh:'gogo|gogo|gogo|gogo'},
+ b:'. . C2 .|. C2 . C2!|. . C2 .|. Eb2 C2 .'},
+{n:'Disco', g:'House & Disco', bpm:118, kit:'std', bass:'funk', keys:'stab',
+ info:'Octave-jumping bass, open hats on the "and", snare on 2 and 4.',
+ d:{k:'x...|x...|x...|x...', s:'....|x...|....|x...', o:'..x.|..x.|..x.|..x.', h:'o...|o...|o...|o...', sh:'.g.g|.g.g|.g.g|.g.g'},
+ b:'A1 . A2 .|A1 . A2 .|D2 . D3 .|D2 . D3 .',
+ ky:'A3:m7 . . .|. . A3:m7 .|D3:9 . . .|. . D3:9 .'},
+{n:'Afro House', g:'House & Disco', bpm:122, sw:.08, st:32, kit:'std', bass:'sub', keys:'pad',
+ info:'Hand-drum toms and shakers over a steady kick.',
+ d:{k:'x...|x...|x...|x...', c:'....|o...|....|o...', lt:'..o.|...o|..o.|.o..', ht:'...o|..o.|o...|..o.', sh:'xgog|xgog|xgog|xgog', r:'o..o|..o.|..o.|o...'},
+ b:'G1 . . G1|. . . .|Bb1 . . .|. . F1 .|G1 . . G1|. . . .|D2 . . .|C2 . Bb1 .',
+ ky:'G3:m7 - - -|- - - -|- - - -|- - - .|Eb3:maj7 - - -|- - - -|- - - -|- - - .'},
+
+// ───────── Techno & Trance ─────────
+{n:'Berlin Techno', g:'Techno & Trance', bpm:132, kit:'tight', bass:'sub',
+ info:'Driving kick, rumbling offbeat sub and hypnotic rim pattern.',
+ d:{k:'x...|x...|x...|x...', c:'....|o...|....|o...', o:'..o.|..o.|..o.|..o.', r:'g..g|..g.|.g..|g..g', sh:'gggg|gggg|gggg|gggg'},
+ b:'. C1 C1 C1|. C1 C1 C1|. C1 C1 C1|. C1 C1 C1'},
+{n:'Acid', g:'Techno & Trance', bpm:128, kit:'tight', bass:'acid',
+ info:'Squelchy resonant line with slides and accents.',
+ d:{k:'x...|x...|x...|x...', c:'....|o...|....|o...', o:'..o.|..o.|..o.|..o.', h:'g...|g...|g...|g...'},
+ b:'C2 C2 C3!~ C2|- Eb2! C2 G2~|C2 . C3! Bb2~|G2 C2! . F2~'},
+{n:'Trance', g:'Techno & Trance', bpm:138, st:32, kit:'tight', bass:'pluck', keys:'pad',
+ info:'Rolling offbeat bass under big sustained chords.',
+ d:{k:'x...|x...|x...|x...', c:'....|x...|....|x...', o:'..o.|..o.|..o.|..o.', sh:'.g.g|.g.g|.g.g|.g.g', cr:'x...|....|....|....|....|....|....|....'},
+ b:'. A1 A1 A1|. A1 A1 A1|. A1 A1 A1|. A1 A1 A1|. F1 F1 F1|. F1 F1 F1|. G1 G1 G1|. G1 G1 G1',
+ ky:'A3:m - - -|- - - -|- - - -|- - - .|F3:maj - - -|- - - .|G3:maj - - -|- - - .'},
+{n:'Industrial / EBM', g:'Techno & Trance', bpm:124, kit:'tight', bass:'pluck',
+ info:'Machine-gun 16th bass, hard snare on 2 and 4.',
+ d:{k:'x...|x...|x...|x...', s:'....|x...|....|x...', c:'....|x...|....|x...', h:'gogo|gogo|gogo|gogo'},
+ b:'E1! E1 E2 E1|E1 E1 E2 E1|G1! G1 G2 G1|D1 D1 D2 D1'},
+{n:'Hardstyle', g:'Techno & Trance', bpm:150, kit:'hard', bass:'growl', keys:'lead',
+ info:'Distorted kick with offbeat growl and a screaming lead.',
+ d:{k:'x...|x...|x...|x...', c:'....|x...|....|x...', o:'..o.|..o.|..o.|..o.'},
+ b:'. . A1 A1|. . A1 A1|. . A1 A1|. . A1 A1',
+ ky:'A4 - - C5|- - E5 -|D5 - - C5|- B4 - .'},
+{n:'Synthwave', g:'Techno & Trance', bpm:100, st:32, kit:'big', bass:'pluck', keys:'pad',
+ info:'Gated-reverb snare, 80s octave bass, lush pad progression.',
+ d:{k:'x...|....|x.x.|....', s:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.o.', cr:'x...|....|....|....|....|....|....|....'},
+ b:'A1 A1 A2 A1|A1 A1 A2 A1|F1 F1 F2 F1|F1 F1 F2 F1|C2 C2 C3 C2|C2 C2 C3 C2|G1 G1 G2 G1|G1 G1 G2 G1',
+ ky:'A3:m - - -|- - - .|F3:maj - - -|- - - .|C4:maj - - -|- - - .|G3:maj - - -|- - - .'},
+{n:'Electro', g:'Techno & Trance', bpm:125, kit:'std', bass:'sub',
+ info:'808-style electro funk with cowbell and syncopated kicks.',
+ d:{k:'x...|..x.|..x.|.x..', c:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.oo', cb:'....|..o.|....|o...'},
+ b:'C2 . . C2|. . C2 .|. Eb2 . .|G1 . Bb1 .'},
+{n:'Ambient', g:'Techno & Trance', bpm:70, st:32, kit:'soft', bass:'sub', keys:'pad',
+ info:'Sparse pulse, long pads drenched in reverb and delay.',
+ d:{k:'x...|....|....|....|....|....|....|....', sh:'..g.|..g.|..g.|..g.', rd:'....|....|....|....|....|....|..g.|....'},
+ b:'D1 - - -|- - - -|- - - -|- - - .|Bb0 - - -|- - - -|- - - -|- - - .',
+ ky:'D3:sus2 - - -|- - - -|- - - -|- - - .|Bb2:maj7 - - -|- - - -|- - - -|- - - .'},
+
+// ───────── UK Bass ─────────
+{n:'Drum & Bass', g:'UK Bass', bpm:174, st:32, kit:'dnb', bass:'reese', keys:'pad',
+ info:'Two-step kick/snare at 174 with a moving reese bass.',
+ d:{k:'x...|....|..x.|....|x...|....|..x.|..x.', s:'....|x...|....|x...|....|x..g|.g..|x..g', h:'o.o.|o.o.|o.og|o.o.', o:'....|....|....|....|....|....|....|..o.'},
+ b:'E1 - - -|- - . .|. . G1 -|- . . .|E1 - - -|- - . .|. . D1 -|C1 - . .',
+ ky:'E3:m9 - - -|- - - -|- - - -|- - - .|C3:maj7 - - -|- - - -|- - - -|- - - .'},
+{n:'Jungle', g:'UK Bass', bpm:165, kit:'dnb', bass:'sub',
+ info:'Chopped breakbeat feel with ride and ghost snares.',
+ d:{k:'x.x.|....|..xx|....', s:'....|x..o|.o.g|x..o', rd:'o.o.|o.o.|o.o.|o.o.'},
+ b:'E1 - - -|- - - -|G1 - - .|A1 - - .'},
+{n:'Dubstep', g:'UK Bass', bpm:140, kit:'boom', bass:'growl',
+ info:'Half-time snare on 3 under a stuttering growl bass.',
+ d:{k:'x...|....|....|..o.', s:'....|....|x...|....', c:'....|....|x...|....', h:'o.o.|o.o.|o.o.|o.o.'},
+ b:'F1! F1 . F1!|. F1~ G#1 .|F1! . . F2!~|F1 . C2 .'},
+{n:'UK Garage', g:'UK Bass', bpm:132, sw:.22, kit:'std', bass:'reese', keys:'stab',
+ info:'Swung two-step with skippy hats and chord stabs.',
+ d:{k:'x...|....|..x.|....', s:'....|x...|....|x...', h:'..o.|..o.|.go.|..og', sh:'.g.g|.g.g|.g.g|.g.g'},
+ b:'F1 . . .|. . F1 .|. . . .|Ab1 . . .',
+ ky:'F3:m7 . . .|. . . .|. . F3:m7 .|. . . .'},
+{n:'Breakbeat', g:'UK Bass', bpm:130, kit:'std', bass:'funk',
+ info:'Big-beat break with syncopated kick and open hat lift.',
+ d:{k:'x.x.|....|..x.|....', s:'....|x..g|.g..|x...', h:'o.o.|o.o.|o.o.|o...', o:'....|....|....|..o.'},
+ b:'D2 . D2 .|. . F2 .|D2 . . C2|. A1 . .'},
+{n:'Footwork', g:'UK Bass', bpm:160, kit:'boom', bass:'b808',
+ info:'Chicago juke: chopped kicks, rapid hats and sparse claps.',
+ d:{k:'x..x|..x.|..x.|.x..', c:'....|....|x...|....', h:'o.oo|o.oo|o.oo|o.oo', lt:'....|.o..|....|..o.'},
+ b:'C2 - . C2|- . Eb2 -|. . C2 -|. Bb1 - .'},
+
+// ───────── Hip-Hop ─────────
+{n:'Boom Bap', g:'Hip-Hop', bpm:90, sw:.16, st:32, kit:'dusty', bass:'round', keys:'ep',
+ info:'90s head-nod: dusty kick, cracking snare, jazzy keys.',
+ d:{k:'x...|....|..x.|.o..|x...|...o|..x.|....', s:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.og', o:'....|....|....|....|....|....|....|..o.'},
+ b:'D2 . . .|. . . D2|. . F2 .|. . A1 .|G1 . . .|. . . G1|. . Bb1 .|. . A1 .',
+ ky:'D3:m9 - - -|- - - .|. . . .|. . . .|G3:m9 - - -|- - - .|. . . .|. . . .'},
+{n:'Trap', g:'Hip-Hop', bpm:140, st:32, kit:'boom', bass:'b808', keys:'bell',
+ info:'Half-time claps, rolling hats and sliding 808s.',
+ d:{k:'x...|....|..x.|....|x...|..x.|...x|....', c:'....|....|x...|....', s:'....|....|x...|....', h:'o.o.|o.o.|ooo.|o.oo|o.o.|o.o.|oooo|o.o.', o:'....|....|....|....|....|....|....|..o.'},
+ b:'C2 - - -|- - - -|C2 - - .|. . . .|C2 - - .|. . Eb2~ -|- G1 - -|- - . .',
+ ky:'C5 . Eb5 .|G5 . . .|F5 . Eb5 .|D5 . . .|C5 . Eb5 .|G5 . Ab5 .|G5 . . .|. . . .'},
+{n:'UK Drill', g:'Hip-Hop', bpm:142, st:32, kit:'boom', bass:'b808', keys:'pad',
+ info:'Sliding 808s, snare on 3 with offbeat stabs, skippy hats.',
+ d:{k:'x...|....|....|..o.|....|..x.|....|....', s:'....|....|x...|...o|....|....|x...|....', h:'o..o|..o.|o..o|..o.|o..o|..o.|.o.o|..o.'},
+ b:'F1 - - -|- - - -|- - . .|. . Ab1~ -|- - . .|. . Db2~ -|- - C2~ -|- . . .',
+ ky:'F3:m - - -|- - - -|- - - -|- - - -|Db3:maj - - -|- - - -|C3:maj - - -|- - - .'},
+{n:'Lo-fi Hip-Hop', g:'Hip-Hop', bpm:78, sw:.2, st:32, kit:'lofi', bass:'round', keys:'ep',
+ info:'Lazy swung beat with mellow maj7 chords.',
+ d:{k:'x...|....|.xx.|....|x...|....|..x.|..o.', s:'....|x...|....|x...', h:'o.go|o.go|o.go|o.go'},
+ b:'F1 . . .|. . F1 .|E1 . . .|. . . .|D1 . . .|. . D2 .|C1 . . .|E1 . G1 .',
+ ky:'F3:maj7 - - -|- - - -|E3:m7 - - -|- - - -|D3:m7 - - -|- - - -|C3:maj7 - - -|- - - -'},
+{n:'G-Funk', g:'Hip-Hop', bpm:94, sw:.1, st:32, kit:'std', bass:'funk', keys:'lead',
+ info:'West-coast bounce, slinky bass and a whining lead.',
+ d:{k:'x...|...x|x.x.|....', c:'....|x...|....|x...', h:'gogo|gogo|gogo|gogo'},
+ b:'A1 . . .|. . A1 A2~|. . G2 .|E2 . D2 .|D2 . . .|. . D2 D3~|. . C3 .|A2 . G2 .',
+ ky:'A5 - - -|- - - -|- - G5~ -|- - - .|F5 - - -|- - - -|- - E5~ -|- - - .'},
+
+// ───────── Funk & Soul ─────────
+{n:'Funk', g:'Funk & Soul', bpm:104, sw:.08, kit:'room', bass:'funk', keys:'stab',
+ info:'Syncopated kick, ghost-note snare and tight 16th hats.',
+ d:{k:'x.o.|....|..x.|.o..', s:'....|x..g|.g.g|x..g', h:'o.og|o.og|o.og|o.og', o:'....|....|....|..o.'},
+ b:'E1! . E2 .|. E1 . G1|A1 . . Bb1|B1 . E2 D2',
+ ky:'E3:9 . . .|. E3:9 . .|. . E3:9 .|. . . .'},
+{n:'Motown', g:'Funk & Soul', bpm:112, kit:'room', bass:'round', keys:'organ',
+ info:'Snare and tambourine on every beat, melodic bass.',
+ d:{k:'x...|..o.|x...|..o.', s:'x...|x...|x...|x...', sh:'x...|x...|x...|x...', h:'..o.|..o.|..o.|..o.'},
+ b:'C2 . . C2|E2 . G2 .|F2 . . F2|A2 . G2 .',
+ ky:'C3:maj . . .|C3:maj . . .|F3:maj . . .|G3:maj . . .'},
+{n:'Neo-Soul', g:'Funk & Soul', bpm:88, sw:.25, st:32, kit:'dusty', bass:'round', keys:'ep',
+ info:'Drunk-swung groove, rim clicks and extended chords.',
+ d:{k:'x...|...o|..x.|....|x...|....|..x.|.o..', r:'....|x...|....|x...', h:'o.go|.go.|o.go|.goo'},
+ b:'Eb2 . . .|. . Eb2 .|. Bb1 . .|C2 . . .|Ab1 . . .|. . Ab1 .|. Bb1 . .|. . . .',
+ ky:'Eb3:maj9 - - -|- - - -|- - - -|- - - .|Ab3:maj9 - - -|- - - -|Bb3:9 - - -|- - - .'},
+{n:'90s R&B', g:'Funk & Soul', bpm:92, sw:.12, kit:'std', bass:'sub', keys:'ep',
+ info:'Smooth swing with snap snare and lush 7ths.',
+ d:{k:'x..x|..x.|....|..o.', s:'....|x...|....|x...', c:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.oo'},
+ b:'A1 . . A1|. . E2 .|D2 . . .|. . E2 .',
+ ky:'A3:m7 - - -|- - - .|D3:9 - - -|- - - .'},
+{n:'Gospel Shout', g:'Funk & Soul', bpm:140, sw:.18, kit:'room', bass:'round', keys:'organ',
+ info:'Up-tempo church shuffle with organ comping.',
+ d:{k:'x..o|..x.|x..o|..x.', s:'..g.|x.g.|..g.|x.gg', h:'o.o.|o.o.|o.o.|o.o.', c:'....|x...|....|x...'},
+ b:'Bb1 . D2 .|F2 . G2 .|Eb2 . G2 .|F2 . A1 .',
+ ky:'Bb3:maj . . Bb3:maj|. . Bb3:maj .|Eb3:maj . . Eb3:maj|. . F3:7 .'},
+
+// ───────── Rock & Pop ─────────
+{n:'Rock', g:'Rock & Pop', bpm:120, st:32, kit:'room', bass:'pluck', keys:'power',
+ info:'Straight 8ths, backbeat snare and power chords.',
+ d:{k:'x...|..x.|x.x.|....', s:'....|x...|....|x...', h:'x.o.|o.o.|o.o.|o.o.', cr:'x...|....|....|....|....|....|....|....'},
+ b:'E1 . E1 .|E1 . E1 .|E1 . E1 .|E1 . E1 .|C1 . C1 .|C1 . C1 .|D1 . D1 .|D1 . D1 .',
+ ky:'E3:5 - - -|- - E3:5 -|- - - -|- - . .|C3:5 - - -|- - - .|D3:5 - - -|- - - .'},
+{n:'Pop', g:'Rock & Pop', bpm:104, st:32, kit:'std', bass:'pluck', keys:'pluck',
+ info:'I–V–vi–IV with clap-and-snare backbeat.',
+ d:{k:'x...|....|x.x.|....', s:'....|x...|....|x...', c:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.o.'},
+ b:'C2 . . C2|. . C2 .|G1 . . G1|. . G1 .|A1 . . A1|. . A1 .|F1 . . F1|. . F1 .',
+ ky:'C4:maj . C4:maj .|C4:maj . . .|G3:maj . G3:maj .|G3:maj . . .|A3:m . A3:m .|A3:m . . .|F3:maj . F3:maj .|F3:maj . . .'},
+{n:'Punk', g:'Rock & Pop', bpm:180, kit:'room', bass:'pluck', keys:'power',
+ info:'Fast and loud: driving 8ths on everything.',
+ d:{k:'x...|..x.|x...|..x.', s:'....|x...|....|x...', h:'x.x.|x.x.|x.x.|x.x.'},
+ b:'E1 . E1 .|E1 . E1 .|G1 . G1 .|A1 . A1 .',
+ ky:'E3:5 . E3:5 .|E3:5 . E3:5 .|G3:5 . G3:5 .|A3:5 . A3:5 .'},
+{n:'Metal', g:'Rock & Pop', bpm:160, kit:'room', bass:'pluck', keys:'power',
+ info:'Double-kick 16ths with chugging low power chords.',
+ d:{k:'xooo|xooo|xooo|xooo', s:'....|x...|....|x...', cr:'x...|....|x...|....', rd:'....|o...|....|o...'},
+ b:'E1! E1 E1 E1|E1 E1 F1! E1|E1! E1 E1 E1|G1 E1 F1! E1',
+ ky:'E2:5 . E2:5 .|E2:5 . F2:5 .|E2:5 . E2:5 .|G2:5 . F2:5 .'},
+{n:'Motorik', g:'Rock & Pop', bpm:130, kit:'room', bass:'pluck', keys:'pad',
+ info:'Krautrock autobahn beat: relentless and straight.',
+ d:{k:'x...|....|x.x.|....', s:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.o.'},
+ b:'D2 . D2 .|D2 . D2 .|D2 . D2 .|C2 . A1 .',
+ ky:'D3:sus2 - - -|- - - -|- - - -|- - - .'},
+{n:'Country Train', g:'Rock & Pop', bpm:112, kit:'room', bass:'round', keys:'stab',
+ info:'Brushy 16th snare train beat with boom-chick bass.',
+ d:{k:'x...|....|x...|....', s:'ggog|xgog|ggog|xgog'},
+ b:'G1 . . .|. . . .|D2 . . .|. . . .',
+ ky:'. . . .|G3:maj . . .|. . . .|G3:maj . . .'},
+{n:'Power Ballad 12/8', g:'Rock & Pop', bpm:62, div:3, st:12, sw:0, kit:'big', bass:'round', keys:'pad',
+ info:'Slow 12/8 with triplet hats and a huge backbeat.',
+ d:{k:'x.....x.o...', s:'...x.....x..', h:'oooooooooooo', cr:'x...........'},
+ b:'C2 - - - - - A1 - - G1 - -',
+ ky:'C3:maj - - - - - A3:m - - G3:maj - -'},
+
+// ───────── Caribbean ─────────
+{n:'Reggae One Drop', g:'Caribbean', bpm:74, sw:.2, kit:'room', bass:'round', keys:'stab',
+ info:'Kick and cross-stick together on beat 3, skank on the backbeat.',
+ d:{k:'....|....|x...|....', r:'....|....|x...|....', h:'o.go|o.go|o.go|o.go'},
+ b:'A1 . . .|. . A1 C2|. . . .|E2 . D2 .',
+ ky:'. . . .|A3:m . . .|. . . .|A3:m . . .'},
+{n:'Ska', g:'Caribbean', bpm:160, kit:'room', bass:'pluck', keys:'organ',
+ info:'Offbeat chord skank over a walking bass.',
+ d:{k:'x...|....|x...|....', s:'....|x...|....|x...', h:'o.o.|o.o.|o.o.|o.o.'},
+ b:'E1 . . .|G#1 . . .|B1 . . .|C#2 . . .',
+ ky:'. . E3:maj .|. . E3:maj .|. . E3:maj .|. . E3:maj .'},
+{n:'Dancehall', g:'Caribbean', bpm:100, kit:'boom', bass:'b808', keys:'pluck',
+ info:'Tresillo kick riddim with snappy claps.',
+ d:{k:'x..x|..x.|x..x|..x.', s:'....|x...|....|x...', c:'....|x...|....|x...', sh:'gogo|gogo|gogo|gogo'},
+ b:'G1 . . G1|. . Bb1 .|C2 . . C2|. . Bb1 .',
+ ky:'. . G4:m .|. . . .|. . C4:m .|. . . .'},
+{n:'Reggaeton', g:'Caribbean', bpm:95, kit:'boom', bass:'b808', keys:'pluck',
+ info:'Dembow: four-on-the-floor with the 3+3+2 snare.',
+ d:{k:'x...|x...|x...|x...', s:'...o|..o.|...o|..o.', h:'o.o.|o.o.|o.o.|o.o.'},
+ b:'D2 - . .|D2 - . .|Bb1 - . .|C2 - . .',
+ ky:'D4:m . . D4:m|. . D4:m .|Bb3:maj . . Bb3:maj|. . C4:maj .'},
+
+// ───────── Latin & Brazil ─────────
+{n:'Bossa Nova', g:'Latin & Brazil', bpm:132, st:32, kit:'soft', bass:'round', keys:'ep',
+ info:'Bossa clave on rim, surdo-style kick, soft jazz chords.',
+ d:{k:'x..o|x..o|x..o|x..o', r:'x..x|..x.|..x.|.x..|..x.|.x..|x..x|....', sh:'o.g.|o.g.|o.g.|o.g.'},
+ b:'D2 . . A1|D2 . . A1|D2 . . A1|D2 . . A1|G1 . . D2|G1 . . D2|G1 . . D2|G1 . . D2',
+ ky:'D3:m9 - - .|. . D3:m9 -|- . . .|D3:m9 - . .|G3:9 - - .|. . G3:9 -|- . . .|G3:9 - . .'},
+{n:'Samba', g:'Latin & Brazil', bpm:100, kit:'room', bass:'round', keys:'pluck',
+ info:'Surdo on 2, driving shaker accents and agogo bell.',
+ d:{k:'o...|x...|o...|x...', sh:'xgog|xgog|xgog|xgog', cb:'x.o.|..x.|o..o|.x..', r:'x.xx|.x.x|x.xx|.x.x'},
+ b:'C2 . . G1|C2 . . G1|C2 . . G1|C2 . . G1',
+ ky:'C4:6 . . C4:6|. . C4:6 .|. C4:6 . .|C4:6 . . .'},
+{n:'Salsa (Son Clave)', g:'Latin & Brazil', bpm:100, kit:'room', bass:'round', keys:'pluck',
+ info:'3-2 son clave, campana bell, conga tumbao and piano montuno.',
+ d:{r:'x..x|..x.|..x.|x...', cb:'x...|o...|x...|o...', ht:'....|x...|....|x...', lt:'....|....|....|..oo', k:'....|....|....|..o.'},
+ b:'. . . .|. . G1 -|- - - -|C2 - - -',
+ ky:'C4 E4 G4 C5|. G4 E4 .|C4 E4 G4 C5|. G4 E4 F4'},
+{n:'Cumbia', g:'Latin & Brazil', bpm:95, kit:'room', bass:'round', keys:'organ',
+ info:'Güira scrape pattern, rim backbeat and bouncing bass.',
+ d:{k:'x...|....|x...|....', sh:'x.oo|x.oo|x.oo|x.oo', r:'....|x...|....|x...', cb:'..o.|..o.|..o.|..o.'},
+ b:'C2 . . .|. . G1 .|C2 . . .|G1 . . .',
+ ky:'. . C4:maj .|. . C4:maj .|. . G3:7 .|. . G3:7 .'},
+{n:'Tango Habanera', g:'Latin & Brazil', bpm:110, kit:'soft', bass:'round', keys:'stab',
+ info:'Dotted habanera rhythm with staccato chords.',
+ d:{k:'x..o|x.o.|x..o|x.o.', r:'....|x...|....|x...'},
+ b:'D2 . . A1|D2 . A1 .|A1 . . E2|A1 . E2 .',
+ ky:'D3:m . . D3:m|D3:m . D3:m .|A3:7 . . A3:7|A3:7 . A3:7 .'},
+
+// ───────── African ─────────
+{n:'Afrobeat', g:'African', bpm:110, kit:'room', bass:'funk', keys:'organ',
+ info:'Tony Allen-style interlocking kick, snare and bell.',
+ d:{k:'x..x|..x.|x...|..x.', s:'..g.|x.g.|.g..|x..g', h:'o.og|o.og|o.og|o.og', o:'....|..o.|....|..o.', cb:'x.x.|.x.x|.x.x|.x.x'},
+ b:'D2 . . D2|. . F2 .|G2 . . F2|. D2 . C2',
+ ky:'D3:m7 . . D3:m7|. . . .|G3:m7 . . G3:m7|. . . .'},
+{n:'Afrobeats', g:'African', bpm:104, kit:'std', bass:'round', keys:'ep',
+ info:'Modern Afro-pop bounce with rim syncopation and shakers.',
+ d:{k:'x...|..x.|..x.|....', r:'x..x|..x.|..x.|....', c:'....|x...|....|x...', sh:'gogo|gogo|gogo|gogo'},
+ b:'F1 . . F1|. . A1 .|Bb1 . . .|C2 . A1 .',
+ ky:'F3:maj7 - - -|- - - .|Bb3:maj7 - - -|- - - .'},
+{n:'Amapiano', g:'African', bpm:113, st:32, kit:'std', bass:'b808', keys:'ep',
+ info:'Log-drum bass slides, shaker 16ths and jazzy chords.',
+ d:{k:'x...|x...|x...|x...', sh:'xoxo|xoxo|xoxo|xoxo', r:'..o.|.o..|..o.|o...', c:'....|....|x...|....'},
+ b:'A1 . . A1|. . A2~ .|. A1 . .|E2 . A1 .|F1 . . F1|. . F2~ .|. F1 . .|C2 . G1 .',
+ ky:'A3:m9 - - -|- - - .|. . . .|. . . .|F3:maj9 - - -|- - - .|. . . .|. . . .'},
+
+// ───────── Jazz & Blues ─────────
+{n:'Jazz Swing', g:'Jazz & Blues', bpm:150, div:3, st:24, kit:'soft', bass:'round', keys:'ep',
+ info:'Spang-a-lang ride, hi-hat on 2 and 4, walking bass, ii–V–I.',
+ d:{rd:'x..x.xx..x.x', h:'...x.....x..', k:'g..g..g..g..', s:'.....g....g.|..g.....g...'},
+ b:'C2 . . E2 . . G2 . . A2 . . D2 . . F2 . . G2 . . B1 . .',
+ ky:'C3:6 . . . . C3:6 . . . A3:7 . . D3:m7 . . . . D3:m7 G3:7 . . . . .'},
+{n:'Blues Shuffle', g:'Jazz & Blues', bpm:96, div:3, st:12, kit:'room', bass:'pluck', keys:'organ',
+ info:'12/8 triplet shuffle with a boogie bass.',
+ d:{k:'x.....x.....', s:'...x.....x..', h:'o.oo.oo.oo.o'},
+ b:'E1 . G#1 B1 . C#2 D2 . C#2 B1 . G#1',
+ ky:'E3:7 . . . . E3:7 . . . . . E3:7'},
+{n:'Jazz Waltz', g:'Jazz & Blues', bpm:140, st:12, kit:'soft', bass:'round', keys:'ep',
+ info:'3/4 with ride, light kick on 1 and walking quarter notes.',
+ d:{rd:'x...|x..o|x...', h:'....|o...|o...', k:'o...|....|....'},
+ b:'D2 . . .|F2 . . .|A2 . . .',
+ ky:'D3:m7 . . .|. . D3:m7 .|. . . .'},
+
+// ───────── World ─────────
+{n:'Bhangra', g:'World', bpm:100, kit:'room', bass:'round', keys:'pluck',
+ info:'Dhol chaal on the toms with a bouncy tumbi line.',
+ d:{lt:'x..x|..x.|x..x|..x.', ht:'..o.|o...|..o.|o..o', k:'x...|....|x...|....', c:'....|x...|....|x...'},
+ b:'D2 . . .|D2 . . .|C2 . . .|D2 . . .',
+ ky:'D5 . F5 D5|. . A5 .|G5 . F5 E5|D5 . . .'},
+{n:'Maqsum', g:'World', bpm:100, kit:'room', bass:'sub', keys:'lead',
+ info:'Arabic doum-tek rhythm with a Hijaz melody.',
+ d:{lt:'x...|....|x...|....', ht:'..x.|..x.|....|x...', r:'.g.g|.g..|.g.g|.g.g', sh:'g.g.|g.g.|g.g.|g.g.'},
+ b:'D1 - - -|- - - -|D1 - - -|- - - .',
+ ky:'D4 Eb4 F#4 G4|A4 - G4 -|F#4 Eb4 D4 -|- - - .'},
+{n:'Polka', g:'World', bpm:120, kit:'room', bass:'round', keys:'organ',
+ info:'Oom-pah in 2: bass on the beat, chords on the offbeat.',
+ d:{k:'x...|....|x...|....', s:'..o.|..o.|..o.|..o.', h:'..o.|..o.|..o.|..o.'},
+ b:'G1 . . .|D2 . . .|G1 . . .|D2 . . .',
+ ky:'. . G3:maj .|. . G3:maj .|. . D3:7 .|. . D3:7 .'},
+];
+if (typeof module !== 'undefined') module.exports = PATTERNS;
+
+const WASM_B64 = "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QYDcC2ogACAAQQBIG0ECdCIAQeCwr4MAaioCACIHIABB4KDegwBqKgIAIgiSQ83MzD2UIC8gMpJDAAAAP5QiCUEAKgLMloCAAJQgK5KSQ4/C9TyUIgGSOAIAQQBBACACQQFqIAJB/tsLShs2AtCwr4MAIAJBAnQiAkHgoN6DAGogGiAHlDgCAEEAIAhBACoC4JCNhAAiDJNDMzOzPpQgDJIiDDgC4JCNhAAgAkHgsK+DAGogDCAalCAJQQAqAsiWgIAAlCAqkpI4AgBBACADQQFqIgJBACACQQAoApCrp4MASBs2ApSrp4MAQQBBACgCoKiogwAiAkECdEGcq6eDAGoiACoCACIJICCUIB9BACoCpKiogwCUkiIMOAKkqKiDACAAIAwgGZQgAZI4AgBBACACQQFqIgJBACACQQAoApyoqIMASBs2AqCoqIMAQQBBACgCrKWpgwAiAkECdEGoqKiDAGoiACoCACIMICCUIB9BACoCsKWpgwCUkiIuOAKwpamDACAAIC4gGZQgAZI4AgBBACACQQFqIgJBACACQQAoAqilqYMASBs2AqylqYMAQQBBACgCuKKqgwAiAkECdEG0pamDAGoiACoCACIuICCUIB9BACoCvKKqgwCUkiIwOAK8oqqDACAAIDAgGZQgAZI4AgBBACACQQFqIgJBACACQQAoArSiqoMASBs2AriiqoMAQQBBACgCxJ+rgwAiAkECdEHAoqqDAGoiACoCACIwICCUIB9BACoCyJ+rgwCUkiIxOALIn6uDACAAIDEgGZQgAZI4AgBBACACQQFqIgJBACACQQAoAsCfq4MASBs2AsSfq4MAQQBBACgC0JysgwAiAkECdEHMn6uDAGoiACoCACIxICCUIB9BACoC1JysgwCUkiIqOALUnKyDACAAICogGZQgAZI4AgBBACACQQFqIgJBACACQQAoAsycrIMASBs2AtCcrIMAQQBBACgC3JmtgwAiAkECdEHYnKyDAGoiACoCACIqICCUIB9BACoC4JmtgwCUkiIrOALgma2DACAAICsgGZQgAZI4AgBBACACQQFqIgJBACACQQAoAtiZrYMASBs2AtyZrYMAQQBBACgC6JaugwAiAkECdEHkma2DAGoiACoCACIrICCUIB9BACoC7JaugwCUkiIzOALslq6DACAAIDMgGZQgAZI4AgBBACACQQFqIgJBACACQQAoAuSWroMASBs2AuiWroMAQQAoArS8roMAIgJBAnRB8JaugwBqIgAgACoCACIBQwAAAD+UIC4gDCAJIAtDAAAAAJKSkpIiC5I4AgBBACACQQFqIgJBACACQQAoArC8roMASBs2ArS8roMAQQAoAvzhroMAIgJBAnRBuLyugwBqIgAgACoCACIJQwAAAD+UIAEgC5MiC5I4AgBBACACQQFqIgJBACACQQAoAvjhroMASBs2AvzhroMAQQAoAsSHr4MAIgJBAnRBgOKugwBqIgAgACoCACIBQwAAAD+UICsgKiAxIDBDAAAAAJKSkpIiDJI4AgBBACACQQFqIgJBACACQQAoAsCHr4MASBs2AsSHr4MAQQAoAoytr4MAIgJBAnRByIevgwBqIgAgACoCACIuQwAAAD+UIAEgDJMiAZI4AgBBACACQQFqIgJBACACQQAoAoitr4MASBs2Aoytr4MAIC4gAZNDAADAP5QgCEPNzEw/lCApIC+SkpIhDEMAAIA/IQhDAACAPyEBAkAgHSAcIAkgC5NDAADAP5QgB0PNzEw/lCAoIDKSkpKUlCIHQwAAQEBeDQBDAACAvyEBIAdDAABAwF0NACAHIAcgB5QiAUMAANhBkpQgAUMAABBBlEMAANhBkpUhAQsgASAelSEBAkAgHSAcIAyUlCIHQwAAQEBeDQBDAACAvyEIIAdDAABAwF0NACAHIAcgB5QiCEMAANhBkpQgCEMAABBBlEMAANhBkpUhCAsgIUECdCICQbCqgIAAaiAIIB6VIgc4AgAgAkGwmoCAAGogATgCAAJAIAGLIgEgB4siByABIAdeGyIBQQAqAoCupoMAXkUNAEEAIAE4AoCupoMAC0EAIBJEAAAAAAAA8D+gIhI5A/CtpoMAICFBAWoiISATRw0ACwsLlAQBA30CQAJAAkACQCAADgMAAQIDCyABIAGSQwAAgL+SIQMCQCABIAJdRQ0AIAMgASAClSIBIAGSIAEgAZSTQwAAgL+Skw8LQwAAAAAhBAJAQwAAgD8gApMgAV1FDQAgAUMAAIC/kiAClSIBIAEgASABlJKSQwAAgD+SIQQLIAMgBJMPCyABQwAAAD+SIgNDAACAv5IgAyADQwAAgD9gGyEDQwAAgD9DAACAvyABQwAAAD9dGyEFAkACQCABIAJdRQ0AIAEgApUiASABkiABIAGUk0MAAIC/kiEEDAELQwAAAAAhBEMAAIA/IAKTIAFdRQ0AIAFDAACAv5IgApUiASABIAEgAZSSkkMAAIA/kiEECyAFIASSIQECQCADIAJdRQ0AIAEgAyAClSICIAKSIAIgApSTQwAAgL+Skw8LQwAAAAAhBAJAQwAAgD8gApMgA11FDQAgA0MAAIC/kiAClSICIAIgAiAClJKSQwAAgD+SIQQLIAEgBJMPCyABQwAAAL+Si0MAAIBAlEMAAIC/kg8LAkACQCABQ9sPyUCUIgFD2w/JQJVDAAAAP5KOQ9sPycCUIAGSIgFD2w/JP15FDQBD2w9JQCABkyEBDAELIAFD2w/Jv11FDQBD2w9JwCABkyEBCyABIAEgAZQiAiACIAIgAkOR7jg2lEMWDVC5kpRDiIgIPJKUQ6uqKr6SlEMAAIA/kpQLC2UCAEGACAswZmZmP2Zm5j4AAAA/zcxMPmZmZj/NzEw/mpkZP4/C9T0AAAA/zcxMPpqZOUDNzDxAAEGwCAsoAIA7R2dFIwE+w643//////////8AAAAAAAAAAAAA8L8AAAAAAADwvw==";
+
+// Engine host: owns the wasm instance. Runs inside the AudioWorklet, or on the main
+// thread through a ScriptProcessorNode when the browser blocks worklets (e.g. file:// pages).
+class EngineCore {
+  constructor(bytes, sr, send) {
+    this.ready = false; this.q = []; this.last = -2; this.fc = 0; this.send = send;
+    WebAssembly.instantiate(bytes, {}).then(r => {
+      const x = this.x = r.instance.exports; x.init(sr);
+      const b = x.memory.buffer;
+      this.v = { drum: new Uint8Array(b, x.ptr_drum(), 768), bn: new Uint8Array(b, x.ptr_bn(), 64), bf: new Uint8Array(b, x.ptr_bf(), 64),
+        kn: new Uint8Array(b, x.ptr_kn(), 256), kf: new Uint8Array(b, x.ptr_kf(), 64), p: new Float32Array(b, x.ptr_params(), 256),
+        mute: new Uint8Array(b, x.ptr_mute(), 16), l: new Float32Array(b, x.ptr_outl(), 512), r: new Float32Array(b, x.ptr_outr(), 512) };
+      this.ready = true; this.q.forEach(m => this.handle(m)); this.q = [];
+      this.send({ t: 'ready', maxLen: x.max_len() });
+    }, err => this.send({ t: 'error', msg: String(err && err.message || err) }));
+  }
+  handle(m) {
+    if (!this.ready) { this.q.push(m); return; }
+    const x = this.x, v = this.v;
+    switch (m.t) {
+      case 'pat': v.drum.set(m.drum); v.bn.set(m.bn); v.bf.set(m.bf); v.kn.set(m.kn); v.kf.set(m.kf); break;
+      case 'params': v.p.set(m.p); break;
+      case 'p': v.p[m.i] = m.v; break;
+      case 'mute': v.mute.set(m.m); break;
+      case 'play': x.play(); break;
+      case 'stop': x.stop(); this.last = -2; break;
+      case 'trig': x.trig(m.tr, m.v); break;
+      case 'non': x.note_on(m.part, m.n, m.v); break;
+      case 'noff': x.note_off(m.part, m.n); break;
+      case 'sample': { const n = Math.min(m.data.length, x.max_len()); new Float32Array(x.memory.buffer, x.ptr_sample(m.slot), n).set(m.data.subarray(0, n)); x.set_sample_len(m.slot, n); break; }
+      case 'factory': x.gen_sample(m.slot); break;
+    }
+  }
+  render(L, R) {
+    const N = L.length;
+    if (!this.ready) { L.fill(0); if (R) R.fill(0); return; }
+    let off = 0;
+    while (off < N) { const n = Math.min(512, N - off); this.x.render(n);
+      L.set(this.v.l.subarray(0, n), off); if (R) R.set(this.v.r.subarray(0, n), off); off += n; }
+    const s = this.x.cur_step();
+    if (s !== this.last) { this.last = s; this.send({ t: 'step', s }); }
+    if (++this.fc % Math.max(1, Math.round(1024 / N)) === 0) this.send({ t: 'pk', v: this.x.get_peak() });
+  }
+}
+const WORKLET = EngineCore.toString() + `
+class Engine extends AudioWorkletProcessor {
+  constructor(o) {
+    super();
+    this.core = new EngineCore(o.processorOptions.bytes, sampleRate, m => this.port.postMessage(m));
+    this.port.onmessage = e => this.core.handle(e.data);
+  }
+  process(_, outs) { const o = outs[0]; this.core.render(o[0], o[1]); return true; }
+}
+registerProcessor('stepcraft', Engine);`;
+
+// ───────── state ─────────
+const NT = TRACKS.length;
+const S = {
+  st: 16, div: 4, bpm: 120, sw: 0,
+  drum: TRACKS.map(() => new Array(MAXST).fill(0)),
+  bass: Array.from({length: MAXST}, () => ({n: 0, f: 0})),
+  keys: Array.from({length: MAXST}, () => ({n: [], f: 0})),
+  P: new Float32Array(256),
+  mute: new Array(14).fill(false), solo: new Array(14).fill(false),
+  sampleName: new Array(NT).fill(null),
+  bassPreset: 'sub', keysPreset: 'pad', patIndex: -1,
+};
+let ctx = null, node = null, ready = false, playing = false, curStep = -1, sel = 0, part = 0, octave = 3;
+const $ = id => document.getElementById(id);
+
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
+function post(m, tr) { if (node) node.port.postMessage(m, tr || []); }
+function setP(i, v) { S.P[i] = v; post({t: 'p', i, v}); }
+
+function applyDefaults() {
+  TRACKS.forEach((t, i) => {
+    const b = i * 8;
+    S.P[b] = t.vol; S.P[b + 1] = t.pan; S.P[b + 2] = 0; S.P[b + 3] = 1; S.P[b + 4] = 0; S.P[b + 5] = t.rev || 0;
+  });
+  const m = MASTER_DEFAULT;
+  S.P[PI_.m_dtime] = m.dtime; S.P[PI_.m_dfb] = m.dfb; S.P[PI_.m_rsize] = m.rsize; S.P[PI_.m_rdamp] = m.rdamp;
+  S.P[PI_.m_vol] = +$('mvol').value; S.P[PI_.m_drive] = m.drive;
+}
+function applyKit(name) {
+  const kit = KITS[name] || {};
+  for (const [id, o] of Object.entries(kit)) {
+    if (id === '_m') { for (const [k, v] of Object.entries(o)) S.P[PI_['m_' + k]] = v; continue; }
+    const i = TRACKS.findIndex(t => t.id === id), b = i * 8;
+    if (o.vol != null) S.P[b] = o.vol; if (o.pan != null) S.P[b + 1] = o.pan; if (o.pitch != null) S.P[b + 2] = o.pitch;
+    if (o.dec != null) S.P[b + 3] = o.dec; if (o.dly != null) S.P[b + 4] = o.dly; if (o.rev != null) S.P[b + 5] = o.rev;
+  }
+}
+function applySynthPreset(p, name) {
+  const pre = (p === 0 ? BASS_PRESETS : KEYS_PRESETS)[name]; if (!pre) return;
+  const pfx = p === 0 ? 'b_' : 'k_';
+  for (const [k, v] of Object.entries(pre)) S.P[PI_[pfx + k]] = v;
+  if (p === 0) S.bassPreset = name; else S.keysPreset = name;
+}
+function syncTiming() {
+  S.P[PI_.m_bpm] = S.bpm; S.P[PI_.m_swing] = S.sw; S.P[PI_.m_steps] = S.st; S.P[PI_.m_div] = S.div;
+}
+function pushAll() { syncTiming(); post({t: 'params', p: S.P.slice()}); pushPattern(); pushMute(); }
+function pushPattern() {
+  const drum = new Uint8Array(768), bn = new Uint8Array(64), bf = new Uint8Array(64), kn = new Uint8Array(256), kf = new Uint8Array(64);
+  for (let t = 0; t < NT; t++) for (let s = 0; s < MAXST; s++) drum[t * 64 + s] = S.drum[t][s];
+  for (let s = 0; s < MAXST; s++) {
+    bn[s] = S.bass[s].n; bf[s] = S.bass[s].f; kf[s] = S.keys[s].f;
+    S.keys[s].n.slice(0, 4).forEach((n, j) => kn[s * 4 + j] = n);
+  }
+  post({t: 'pat', drum, bn, bf, kn, kf});
+  save();
+}
+function pushMute() {
+  const anySolo = S.solo.some(Boolean);
+  post({t: 'mute', m: Uint8Array.from({length: 16}, (_, i) => i < 14 && (S.mute[i] || (anySolo && !S.solo[i])) ? 1 : 0)});
+}
+
+function loadPattern(i) {
+  const p = PATTERNS[i], r = parsePattern(p);
+  S.patIndex = i; S.st = r.st; S.div = r.div; S.bpm = r.bpm; S.sw = r.sw;
+  for (let t = 0; t < NT; t++) for (let s = 0; s < MAXST; s++) S.drum[t][s] = s < r.st ? r.drum[t][s] : 0;
+  for (let s = 0; s < MAXST; s++) {
+    S.bass[s] = s < r.st ? {...r.bass[s]} : {n: 0, f: 0};
+    S.keys[s] = s < r.st ? {n: [...r.keys[s].n], f: r.keys[s].f} : {n: [], f: 0};
+  }
+  // keep any user samples' track names; reset mix to the kit
+  applyDefaults(); applyKit(p.kit || 'std');
+  applySynthPreset(0, p.bass || 'sub'); applySynthPreset(1, p.keys || 'pad');
+  S.mute.fill(false); S.solo.fill(false);
+  pushAll(); renderAll();
+}
+
+// ───────── persistence (per-viewer convenience) ─────────
+function save() {
+  try { localStorage.setItem('stepcraft12', JSON.stringify({st: S.st, div: S.div, bpm: S.bpm, sw: S.sw, drum: S.drum, bass: S.bass, keys: S.keys,
+    P: Array.from(S.P), bassPreset: S.bassPreset, keysPreset: S.keysPreset, patIndex: S.patIndex})); } catch (e) {}
+}
+function restore() {
+  try {
+    const d = JSON.parse(localStorage.getItem('stepcraft12') || 'null'); if (!d || !d.drum) return false;
+    Object.assign(S, {st: d.st, div: d.div, bpm: d.bpm, sw: d.sw, drum: d.drum, bass: d.bass, keys: d.keys,
+      bassPreset: d.bassPreset, keysPreset: d.keysPreset, patIndex: d.patIndex});
+    S.P.set(d.P); return true;
+  } catch (e) { return false; }
+}
+
+// ───────── audio ─────────
+let audioStarting = null, engineMode = '';
+function onEngineMsg(m) {
+  if (m.t === 'ready') { ready = true; $('status').textContent = `Engine running · ${ctx.sampleRate / 1000} kHz · ${engineMode}`; pushAll(); }
+  else if (m.t === 'step') { const lat = (ctx.outputLatency || 0) + (ctx.baseLatency || 0); setTimeout(() => showStep(m.s), lat * 1000); }
+  else if (m.t === 'pk') $('meter').style.width = Math.min(100, m.v * 100) + '%';
+  else if (m.t === 'error') showError('The audio engine could not start: ' + m.msg);
+}
+function showError(msg) { $('status').textContent = msg; $('status').classList.add('err'); toast(msg); }
+function wasmBytes() { return Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0)).buffer; }
+async function startWorklet() {
+  if (!ctx.audioWorklet) throw new Error('AudioWorklet not available');
+  const url = URL.createObjectURL(new Blob([WORKLET], {type: 'application/javascript'}));
+  await ctx.audioWorklet.addModule(url);
+  node = new AudioWorkletNode(ctx, 'stepcraft', {numberOfInputs: 0, outputChannelCount: [2], processorOptions: {bytes: wasmBytes()}});
+  node.port.onmessage = e => onEngineMsg(e.data);
+  node.connect(ctx.destination);
+  engineMode = 'AudioWorklet';
+}
+function startMainThread() {
+  // Fallback for pages opened from disk or browsers without worklet support.
+  const core = new EngineCore(wasmBytes(), ctx.sampleRate, m => onEngineMsg(m));
+  const sp = ctx.createScriptProcessor(1024, 0, 2);
+  sp.onaudioprocess = e => core.render(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1));
+  sp.connect(ctx.destination);
+  node = {port: {postMessage: m => core.handle(m)}, sp};
+  engineMode = 'main-thread fallback';
+}
+function ensureAudio() {
+  if (!audioStarting) audioStarting = (async () => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('This browser has no Web Audio support.');
+    try { ctx = new AC({sampleRate: 48000, latencyHint: 'interactive'}); } catch (e) { ctx = new AC(); }
+    $('status').textContent = 'Starting audio engine…';
+    try { await startWorklet(); }
+    catch (e) { console.warn('Worklet unavailable, using main-thread audio:', e); startMainThread(); }
+    pushAll();
+  })().catch(e => { audioStarting = null; ctx = null; node = null; showError(e.message || String(e)); throw e; });
+  return audioStarting.then(async () => { if (ctx.state !== 'running') await ctx.resume(); });
+}
+async function togglePlay(force) {
+  try { await ensureAudio(); } catch (e) { return; }
+  playing = force != null ? force : !playing;
+  post({t: playing ? 'play' : 'stop'});
+  $('play').setAttribute('aria-pressed', playing); $('play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  if (!playing) showStep(-1);
+}
+async function hit(t, v = 0.9) { try { await ensureAudio(); } catch (e) { return; } post({t: 'trig', tr: t, v}); }
+const held = new Map();
+async function noteOn(n, v = 0.85) { try { await ensureAudio(); } catch (e) { return; } post({t: 'non', part, n, v}); }
+function noteOff(n) { post({t: 'noff', part, n}); }
+function preview(n) { noteOn(n); setTimeout(() => noteOff(n), 260); }
+
+// ───────── drum grid ─────────
+let stepEls = [], rulerEls = [];
+function renderDrums() {
+  const g = $('dgrid'), st = S.st, beat = S.div;
+  const lw = innerWidth < 560 ? 160 : 180;
+  g.style.gridTemplateColumns = `${lw}px repeat(${st}, minmax(22px, 1fr))`;
+  g.style.minWidth = (lw + st * 25) + 'px';
+  g.innerHTML = ''; stepEls = []; rulerEls = [];
+  g.append(document.createElement('div'));
+  for (let s = 0; s < st; s++) {
+    const r = document.createElement('div'); r.className = 'ruler led'; rulerEls.push(r); g.append(r);
+  }
+  TRACKS.forEach((t, ti) => {
+    const fam = `var(--${t.fam})`;
+    const lab = document.createElement('div'); lab.className = 'trk' + (ti === sel ? ' sel' : ''); lab.style.setProperty('--fam', fam);
+    const nm = document.createElement('button'); nm.className = 'name';
+    nm.innerHTML = `<span>${t.name}</span>` + (S.sampleName[ti] ? `<span class="src">user</span>` : '');
+    nm.title = `Select ${t.name} and play it`;
+    nm.onclick = () => { sel = ti; hit(ti); renderDrums(); renderInspector(); };
+    const m = msBtn('m', ti), so = msBtn('s', ti);
+    lab.append(nm, m, so); g.append(lab);
+    const row = [];
+    for (let s = 0; s < st; s++) {
+      const b = document.createElement('button'); b.className = 'step' + (Math.floor(s / beat) % 2 === 0 ? '' : ' beat');
+      b.style.setProperty('--fam', fam); b.dataset.v = S.drum[ti][s];
+      b.setAttribute('aria-label', `${t.name} step ${s + 1}`);
+      b.onclick = () => { const v = S.drum[ti][s]; const nv = [2, 3, 0, 1][v]; S.drum[ti][s] = nv; b.dataset.v = nv; if (nv && !playing) hit(ti, [0, .35, .75, 1][nv]); pushPattern(); };
+      b.oncontextmenu = e => { e.preventDefault(); S.drum[ti][s] = 0; b.dataset.v = 0; pushPattern(); };
+      row.push(b); g.append(b);
+    }
+    stepEls.push(row);
+  });
+  // beat numbers
+  g.append(document.createElement('div'));
+  for (let s = 0; s < st; s++) { const r = document.createElement('div'); r.className = 'ruler'; r.textContent = s % beat === 0 ? (s / beat + 1) : '·'; g.append(r); }
+}
+function msBtn(kind, i) {
+  const b = document.createElement('button'); b.className = 'ms ' + kind; b.textContent = kind.toUpperCase();
+  const arr = kind === 'm' ? S.mute : S.solo;
+  b.setAttribute('aria-pressed', arr[i]); b.title = kind === 'm' ? 'Mute' : 'Solo';
+  b.onclick = () => { arr[i] = !arr[i]; b.setAttribute('aria-pressed', arr[i]); pushMute(); };
+  return b;
+}
+function showStep(s) {
+  if (curStep >= 0) {
+    stepEls.forEach(r => r[curStep] && r[curStep].classList.remove('now'));
+    rulerEls[curStep] && rulerEls[curStep].classList.remove('on');
+    rollCols[curStep] && rollCols[curStep].forEach(c => c.classList.remove('now'));
+  }
+  curStep = s;
+  if (s >= 0) {
+    stepEls.forEach(r => r[s] && r[s].classList.add('now'));
+    rulerEls[s] && rulerEls[s].classList.add('on');
+    rollCols[s] && rollCols[s].forEach(c => c.classList.add('now'));
+  }
+}
+
+// ───────── controls ─────────
+function ctl(label, idx, min, max, step, fmt, onChange) {
+  const w = document.createElement('label'); w.className = 'ctl';
+  const id = 'c' + idx;
+  w.innerHTML = `<span class="label">${label}</span><output class="num"></output><input type="range" id="${id}" min="${min}" max="${max}" step="${step}">`;
+  const inp = w.querySelector('input'), out = w.querySelector('output');
+  inp.value = S.P[idx]; out.textContent = fmt(S.P[idx]);
+  inp.oninput = () => { const v = +inp.value; setP(idx, v); out.textContent = fmt(v); onChange && onChange(v); save(); };
+  return w;
+}
+const pct = v => Math.round(v * 100) + '%';
+const hz = v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz';
+const sec = v => v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s';
+const st_ = v => (v > 0 ? '+' : '') + Math.round(v) + ' st';
+const panf = v => Math.abs(v) < .02 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 100);
+
+function renderInspector() {
+  const t = TRACKS[sel], b = sel * 8, el = $('insp');
+  el.style.setProperty('--fam', `var(--${t.fam})`);
+  el.innerHTML = '';
+  const id = document.createElement('div'); id.className = 'insp-id';
+  id.innerHTML = `<span class="label">Track ${sel + 1} · key ${'1234567890-='[sel]}</span><b>${t.name}</b><span class="src">${S.sampleName[sel] ? 'Sample: ' + S.sampleName[sel] : 'Factory sample (synthesised in WASM)'}</span>`;
+  const btns = document.createElement('div'); btns.className = 'row-btns';
+  const mk = (txt, fn, cls) => { const x = document.createElement('button'); x.className = 'sbtn' + (cls ? ' ' + cls : ''); x.textContent = txt; x.onclick = fn; btns.append(x); };
+  mk('Load sample…', () => $('fileIn').click(), 'primary');
+  if (S.sampleName[sel]) mk('Restore factory', async () => { await ensureAudio(); post({t: 'factory', slot: sel}); S.sampleName[sel] = null; renderDrums(); renderInspector(); toast(`${t.name}: factory sample restored`); });
+  mk('Every beat', () => fillRow(S.div));
+  mk('Every 2nd step', () => fillRow(2));
+  mk('Clear row', () => fillRow(0));
+  id.append(btns);
+  const k = document.createElement('div'); k.className = 'knobs';
+  k.append(ctl('Level', b, 0, 1.2, .01, pct), ctl('Pan', b + 1, -1, 1, .01, panf), ctl('Tune', b + 2, -24, 24, 1, st_),
+    ctl('Decay', b + 3, .05, 1, .01, v => v >= .99 ? 'full' : pct(v)), ctl('Delay send', b + 4, 0, 1, .01, pct), ctl('Reverb send', b + 5, 0, 1, .01, pct));
+  el.append(id, k);
+}
+function fillRow(every) {
+  for (let s = 0; s < S.st; s++) S.drum[sel][s] = every && s % every === 0 ? 2 : 0;
+  pushPattern(); renderDrums();
+}
+
+$('fileIn').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    await ensureAudio();
+    const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+    const n = Math.min(buf.length, Math.round(ctx.sampleRate * 3)), mono = new Float32Array(n);
+    for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels; }
+    let pk = 0; for (const v of mono) pk = Math.max(pk, Math.abs(v)); if (pk > 0) for (let i = 0; i < n; i++) mono[i] *= .9 / pk;
+    const fade = Math.min(480, n); for (let i = 0; i < fade; i++) mono[n - 1 - i] *= i / fade;
+    post({t: 'sample', slot: sel, data: mono}, [mono.buffer]);
+    S.sampleName[sel] = f.name; renderDrums(); renderInspector(); hit(sel);
+    toast(`${TRACKS[sel].name} now plays ${f.name}` + (buf.length > n ? ' (trimmed to 3 s)' : ''));
+  } catch (err) { toast('That file could not be decoded. Try a WAV, MP3, OGG or M4A file.'); }
+};
+
+// ───────── piano roll ─────────
+let rollCols = [];
+const ROLL = [{lo: 24, hi: 59}, {lo: 43, hi: 84}];
+function rollNotes(s) { // [{n, kind:'on'|'tie', acc}]
+  const arr = part === 0 ? S.bass : S.keys;
+  let k = s, guard = 0;
+  while ((arr[k].f & 4) && guard++ < S.st) k = (k - 1 + S.st) % S.st;
+  const src = arr[k], tie = k !== s;
+  const notes = part === 0 ? (src.n ? [src.n] : []) : src.n;
+  return {notes, tie, acc: !!(arr[s].f & 1) || (!tie && !!(src.f & 1))};
+}
+function renderRoll() {
+  const {lo, hi} = ROLL[part], st = S.st, roll = $('roll'), flags = $('flags');
+  const cols = `46px repeat(${st}, minmax(20px, 1fr))`, minW = (46 + st * 22) + 'px';
+  roll.style.gridTemplateColumns = cols; roll.style.minWidth = minW;
+  flags.style.gridTemplateColumns = cols; flags.style.minWidth = minW;
+  roll.innerHTML = ''; flags.innerHTML = ''; rollCols = Array.from({length: st}, () => []);
+  const info = Array.from({length: st}, (_, s) => rollNotes(s));
+  for (let n = hi; n >= lo; n--) {
+    const blk = [1, 3, 6, 8, 10].includes(n % 12);
+    const k = document.createElement('div'); k.className = 'rk' + (blk ? ' blk' : '') + (n % 12 === 0 ? ' c' : '');
+    k.textContent = noteName(n); roll.append(k);
+    for (let s = 0; s < st; s++) {
+      const c = document.createElement('button'); const i = info[s], has = i.notes.includes(n);
+      c.className = 'rc' + (blk ? ' blk' : '') + (s % S.div === 0 ? ' beat' : '') + (has ? (i.tie ? ' tie' : ' on') : '') + (has && i.acc ? ' acc' : '');
+      c.setAttribute('aria-label', `${noteName(n)} step ${s + 1}`); c.tabIndex = -1;
+      c.onclick = () => editNote(s, n);
+      rollCols[s].push(c); roll.append(c);
+    }
+  }
+  const fl = part === 0 ? [['Accent', 1], ['Slide', 2], ['Tie', 4]] : [['Accent', 1], ['Tie', 4]];
+  const arr = part === 0 ? S.bass : S.keys;
+  for (const [name, bit] of fl) {
+    const l = document.createElement('div'); l.className = 'flag-name'; l.textContent = name; flags.append(l);
+    for (let s = 0; s < st; s++) {
+      const b = document.createElement('button'); b.className = 'flag' + (arr[s].f & bit ? ' on' : '');
+      b.textContent = name[0]; b.setAttribute('aria-label', `${name} step ${s + 1}`);
+      b.onclick = () => { arr[s].f ^= bit; if (bit === 4 && (arr[s].f & 4)) arr[s].n = part === 0 ? 0 : []; pushPattern(); renderRoll(); };
+      flags.append(b);
+    }
+  }
+  $('rollHint').textContent = part === 0 ? 'Mono · one note per step · Slide glides from the previous note' : 'Poly · up to 4 notes per step · Tie holds the previous chord';
+  $('synMute').setAttribute('aria-pressed', S.mute[12 + part]);
+  // presets & knobs
+  const ps = $('synPreset'), presets = part === 0 ? BASS_PRESETS : KEYS_PRESETS, cur = part === 0 ? S.bassPreset : S.keysPreset;
+  ps.innerHTML = Object.keys(presets).map(k => `<option value="${k}"${k === cur ? ' selected' : ''}>${PRESET_LABEL[k] || k}</option>`).join('');
+  renderSynKnobs();
+  $('octOut').textContent = noteName(octave * 12 + 12);
+}
+const PRESET_LABEL = {acid: 'Acid 303', sub: 'Sub bass', b808: '808 boom', reese: 'Reese', pluck: 'Pluck', funk: 'Funk', round: 'Round / upright', growl: 'Growl',
+  pad: 'Warm pad', stab: 'Chord stab', organ: 'Organ', ep: 'Electric piano', lead: 'Saw lead', brass: 'Brass', power: 'Power chords', bell: 'Bell'};
+const WAVES = ['Saw', 'Square', 'Triangle', 'Sine'];
+function renderSynKnobs() {
+  const k = $('synKnobs'); k.innerHTML = '';
+  if (part === 0) {
+    k.append(ctl('Wave', PI_.b_wave, 0, 3, 1, v => WAVES[v | 0]), ctl('Sub osc', PI_.b_sub, 0, 1, .01, pct),
+      ctl('Cutoff', PI_.b_cut, 40, 4000, 1, hz), ctl('Resonance', PI_.b_res, 0, .96, .01, pct),
+      ctl('Env mod', PI_.b_env, 0, 5, .05, v => v.toFixed(1) + ' oct'), ctl('Filter decay', PI_.b_fdec, .02, 2, .01, sec),
+      ctl('Amp decay', PI_.b_adec, .05, 3, .01, sec), ctl('Sustain', PI_.b_sus, 0, 1, .01, pct),
+      ctl('Accent', PI_.b_acc, 0, 1, .01, pct), ctl('Glide', PI_.b_glide, .005, .4, .005, sec),
+      ctl('Drive', PI_.b_drive, 0, 1, .01, pct), ctl('Level', PI_.b_vol, 0, 1.2, .01, pct),
+      ctl('Delay send', PI_.b_dly, 0, 1, .01, pct), ctl('Reverb send', PI_.b_rev, 0, 1, .01, pct));
+  } else {
+    k.append(ctl('Wave', PI_.k_wave, 0, 3, 1, v => WAVES[v | 0]), ctl('Detune', PI_.k_det, 0, 40, .5, v => v.toFixed(1) + ' ct'),
+      ctl('Cutoff', PI_.k_cut, 80, 8000, 1, hz), ctl('Resonance', PI_.k_res, 0, .95, .01, pct),
+      ctl('Env mod', PI_.k_env, 0, 4, .05, v => v.toFixed(1) + ' oct'), ctl('Attack', PI_.k_a, .001, 2, .001, sec),
+      ctl('Decay', PI_.k_d, .02, 3, .01, sec), ctl('Sustain', PI_.k_s, 0, 1, .01, pct),
+      ctl('Release', PI_.k_r, .02, 3, .01, sec), ctl('Level', PI_.k_vol, 0, 1, .01, pct),
+      ctl('Delay send', PI_.k_dly, 0, 1, .01, pct), ctl('Reverb send', PI_.k_rev, 0, 1, .01, pct));
+  }
+}
+function editNote(s, n) {
+  if (part === 0) {
+    const c = S.bass[s];
+    if (c.n === n && !(c.f & 4)) c.n = 0; else { c.n = n; c.f &= ~4; preview(n); }
+  } else {
+    const c = S.keys[s];
+    if (c.f & 4) { c.f &= ~4; c.n = []; }
+    const i = c.n.indexOf(n);
+    if (i >= 0) c.n.splice(i, 1); else { c.n.push(n); if (c.n.length > 4) c.n.shift(); preview(n); }
+  }
+  pushPattern(); renderRoll();
+}
+function scrollRollToNotes() {
+  const arr = part === 0 ? S.bass : S.keys, {hi} = ROLL[part];
+  let top = 0;
+  for (let s = 0; s < S.st; s++) { const ns = part === 0 ? (arr[s].n ? [arr[s].n] : []) : arr[s].n; for (const n of ns) top = Math.max(top, n); }
+  const sc = $('rollScroll'); sc.scrollTop = top ? Math.max(0, (hi - top - 4) * 15) : 0;
+}
+$('rollScroll').addEventListener('scroll', () => { $('flagScroll').scrollLeft = $('rollScroll').scrollLeft; });
+$('flagScroll').addEventListener('scroll', () => { $('rollScroll').scrollLeft = $('flagScroll').scrollLeft; });
+function setPart(p) {
+  part = p; octave = p === 0 ? 2 : 4;
+  $('tabBass').setAttribute('aria-selected', p === 0); $('tabKeys').setAttribute('aria-selected', p === 1);
+  renderRoll(); scrollRollToNotes();
+}
+$('tabBass').onclick = () => setPart(0); $('tabKeys').onclick = () => setPart(1);
+$('synPreset').onchange = e => { applySynthPreset(part, e.target.value); post({t: 'params', p: S.P.slice()}); renderSynKnobs(); save(); };
+$('synMute').onclick = () => { S.mute[12 + part] = !S.mute[12 + part]; $('synMute').setAttribute('aria-pressed', S.mute[12 + part]); pushMute(); };
+$('clearSyn').onclick = () => {
+  for (let s = 0; s < MAXST; s++) { if (part === 0) S.bass[s] = {n: 0, f: 0}; else S.keys[s] = {n: [], f: 0}; }
+  pushPattern(); renderRoll(); toast(part === 0 ? 'Bass part cleared' : 'Keys part cleared');
+};
+
+// ───────── FX ─────────
+function renderFx() {
+  const f = $('fx'); f.innerHTML = '';
+  f.append(ctl('Delay time', PI_.m_dtime, 1, 8, 1, v => `${v | 0} step${v > 1 ? 's' : ''}`), ctl('Delay feedback', PI_.m_dfb, 0, .9, .01, pct),
+    ctl('Reverb size', PI_.m_rsize, .5, .97, .01, pct), ctl('Reverb damping', PI_.m_rdamp, 0, .95, .01, pct),
+    ctl('Master drive', PI_.m_drive, 0, 1, .01, pct));
+}
+
+// ───────── library ─────────
+const FAMS = [...new Set(PATTERNS.map(p => p.g))];
+let fam = FAMS[0];
+function renderLib() {
+  $('libCount').textContent = `${PATTERNS.length} grooves in ${FAMS.length} genre families`;
+  const fb = $('fams'); fb.innerHTML = '';
+  FAMS.forEach(g => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = g; b.setAttribute('aria-pressed', g === fam);
+    b.onclick = () => { fam = g; renderLib(); }; fb.append(b); });
+  const pb = $('pats'); pb.innerHTML = '';
+  PATTERNS.forEach((p, i) => { if (p.g !== fam) return;
+    const b = document.createElement('button'); b.className = 'pat'; b.setAttribute('aria-current', i === S.patIndex);
+    b.innerHTML = `<span>${p.n}</span><small>${p.bpm}</small>`; b.title = p.info;
+    b.onclick = () => { loadPattern(i); renderLib(); }; pb.append(b); });
+  const cp = PATTERNS[S.patIndex];
+  $('patName').textContent = cp ? cp.n : 'Custom pattern';
+  $('patInfo').textContent = cp ? `${cp.g} · ${cp.info}` : '';
+}
+function stepPat(d) { const i = ((S.patIndex < 0 ? 0 : S.patIndex) + d + PATTERNS.length) % PATTERNS.length; fam = PATTERNS[i].g; loadPattern(i); renderLib(); }
+$('prevPat').onclick = () => stepPat(-1); $('nextPat').onclick = () => stepPat(1);
+
+// ───────── transport & globals ─────────
+function renderTransport() {
+  $('bpm').value = S.bpm; $('swing').value = S.sw; $('swOut').textContent = Math.round(50 + S.sw * 50) + '%';
+  $('div').value = S.div;
+  const sel = $('steps'); if (![...sel.options].some(o => +o.value === S.st)) sel.add(new Option(S.st, S.st));
+  sel.value = S.st; $('mvol').value = S.P[PI_.m_vol];
+}
+function renderAll() { renderTransport(); renderDrums(); renderInspector(); renderRoll(); renderFx(); scrollRollToNotes(); }
+$('play').onclick = () => togglePlay();
+$('stop').onclick = () => togglePlay(false);
+$('bpm').onchange = e => { S.bpm = Math.max(30, Math.min(300, +e.target.value || 120)); e.target.value = S.bpm; setP(PI_.m_bpm, S.bpm); save(); };
+$('swing').oninput = e => { S.sw = +e.target.value; $('swOut').textContent = Math.round(50 + S.sw * 50) + '%'; setP(PI_.m_swing, S.sw); save(); };
+$('steps').onchange = e => { S.st = +e.target.value; setP(PI_.m_steps, S.st); pushPattern(); renderDrums(); renderRoll(); };
+$('div').onchange = e => { S.div = +e.target.value; setP(PI_.m_div, S.div); renderDrums(); renderRoll(); save(); };
+$('mvol').oninput = e => setP(PI_.m_vol, +e.target.value);
+$('clearDrums').onclick = () => { S.drum.forEach(r => r.fill(0)); S.patIndex = -1; pushPattern(); renderDrums(); renderLib(); toast('Drums cleared'); };
+$('dblBtn').onclick = () => {
+  const n = S.st; if (n * 2 > MAXST) { toast(`Already at ${n} steps — the maximum is ${MAXST}`); return; }
+  for (let s = 0; s < n; s++) { S.drum.forEach(r => r[s + n] = r[s]); S.bass[s + n] = {...S.bass[s]}; S.keys[s + n] = {n: [...S.keys[s].n], f: S.keys[s].f}; }
+  S.st = n * 2; setP(PI_.m_steps, S.st); pushPattern(); renderAll(); toast(`Pattern doubled to ${S.st} steps`);
+};
+
+// computer keyboard
+const KEYMAP = {a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14, p: 15};
+const PADS = '1234567890-=';
+window.addEventListener('keydown', e => {
+  if (e.target.matches('input[type=number], select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); return; }
+  if (e.repeat) return;
+  if (PADS.includes(key)) { hit(PADS.indexOf(key)); return; }
+  if (key === 'z') { octave = Math.max(0, octave - 1); $('octOut').textContent = noteName(octave * 12 + 12); return; }
+  if (key === 'x') { octave = Math.min(7, octave + 1); $('octOut').textContent = noteName(octave * 12 + 12); return; }
+  if (key in KEYMAP) { const n = (octave + 1) * 12 + KEYMAP[key]; held.set(key, n); noteOn(n); }
+});
+window.addEventListener('keyup', e => { const key = e.key.toLowerCase(); if (held.has(key)) { noteOff(held.get(key)); held.delete(key); } });
+
+// boot
+applyDefaults();
+if (restore()) { fam = PATTERNS[S.patIndex] ? PATTERNS[S.patIndex].g : fam; renderAll(); }
+else loadPattern(0);
+renderLib(); setPart(0);
+</script>
+
+</body>
+</html>
