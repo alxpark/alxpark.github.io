@@ -10,6 +10,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Pixel Run | `/pixel-run/` | private repo `alxpark/pixel-run` |
 | CRATE-16 | `/crate16/` | private repo `alxpark/crate16` (`npm run build` → `docs/index.html`) |
 | Lathe-4 | `/lathe4/` | private repo `alxpark/lathe4` |
+| RETRO//TRACK | `/retrotrack/` | private repo `alxpark/retrotrack` (`./build.sh` → `dist/index.html`) |
 
 ## Adding an app
 
