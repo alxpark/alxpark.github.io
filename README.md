@@ -7,6 +7,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | App | Path | Source |
 | --- | --- | --- |
 | Ember Well | `/ember-well/` | private repo `alxpark/ember-well` |
+| Saturday 5K | `/pixel-run/` | private repo `alxpark/pixel-run` |
 
 ## Adding an app
 
