@@ -225,7 +225,7 @@ button{font:inherit;color:inherit}
   <section class="padsec" aria-label="Pads">
     <div class="banks" id="banks"></div>
     <div class="pads" id="pads"></div>
-    <p class="hint" style="margin:0">Keys <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> · <kbd>Q</kbd>–<kbd>R</kbd> · <kbd>A</kbd>–<kbd>F</kbd> · <kbd>Z</kbd>–<kbd>V</kbd> play pads, <kbd>Space</kbd> plays the pattern. Drop audio files on a pad to load them.</p>
+    <p class="hint" style="margin:0">Keys <kbd>Z</kbd>–<kbd>V</kbd> play pads 1–4 on the bottom row, up to <kbd>1</kbd>–<kbd>4</kbd> for pads 13–16 on top. <kbd>Space</kbd> plays the pattern. Drop audio files on a pad to load them.</p>
   </section>
 
   <!-- PAD EDIT -->
@@ -815,6 +815,7 @@ function buildPads(){
   for (let i = 0; i < 16; i++) {
     const b = el('button', 'pad'); b.innerHTML = '<span class="pn"></span><span class="led"></span><span class="pnm"></span>';
     b.dataset.slot = i;
+    b.style.gridRow = String(4 - Math.floor(i / 4)); b.style.gridColumn = String(i % 4 + 1); // pad 1 bottom-left, pad 16 top-right
     const on = e => { e.preventDefault(); padDown(S.bank * 16 + i, 1); b.classList.add('hit'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
     const off = () => { if (!b.classList.contains('hit')) return; b.classList.remove('hit'); padUp(S.bank * 16 + i); };
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
@@ -1180,7 +1181,8 @@ async function exportWav(){
 }
 
 /* ═════════════ keyboard & MIDI ═════════════ */
-const KEYMAP = ['1', '2', '3', '4', 'q', 'w', 'e', 'r', 'a', 's', 'd', 'f', 'z', 'x', 'c', 'v'];
+// keyboard rows mirror the pad grid: Z–V = pads 1–4 (bottom row) … 1–4 = pads 13–16 (top row)
+const KEYMAP = ['z', 'x', 'c', 'v', 'a', 's', 'd', 'f', 'q', 'w', 'e', 'r', '1', '2', '3', '4'];
 const keyHeld = new Set();
 window.addEventListener('keydown', e => {
   if (e.target.closest && e.target.closest('input,textarea,[role=slider]')) return;
