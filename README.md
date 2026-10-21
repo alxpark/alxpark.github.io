@@ -8,6 +8,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | --- | --- | --- |
 | Ember Well | `/ember-well/` | private repo `alxpark/ember-well` |
 | Pixel Run | `/pixel-run/` | private repo `alxpark/pixel-run` |
+| CRATE-16 | `/crate16/` | private repo `alxpark/crate16` (`npm run build` → `docs/index.html`) |
 
 ## Adding an app
 

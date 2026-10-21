@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="CRATE-16 — 16-pad × 10-bank browser sampler & effector with a WebAssembly DSP engine.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Crate Sampler</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600&family=VT323&display=swap">
+<style>
+/* Layout: one hardware chassis — FX | LCD on top, controls | 4×4 pads | pad edit in the middle, pattern grid deck below. Single deliberate dark look. */
+:root{
+  color-scheme: dark;
+  --desk:#101114;
+  --chassis:#25282e;
+  --chassis-hi:#2e3238;
+  --plate:#1b1d22;
+  --rubber:#c9c6bd;
+  --rubber-dim:#8f8c84;
+  --ink:#e9e6df;
+  --ink-mute:#9a9ea6;
+  --ink-faint:#6a6e76;
+  --amber:#ffb23e;
+  --amber-glow:rgba(255,178,62,.55);
+  --teal:#5fd9cf;
+  --teal-glow:rgba(95,217,207,.5);
+  --white-led:#f4f1e6;
+  --red:#ff5a4a;
+  --lcd-bg:#1a1206;
+  --lcd-ink:#ffb23e;
+  --lcd-dim:#7a5418;
+  --line:#3a3e45;
+  --f-display:"Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-lcd:"VT323", ui-monospace, "Courier New", monospace;
+}
+html,body{background:var(--desk);color:var(--ink)}
+body{font-family:var(--f-body);font-size:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit}
+.dev{max-width:1240px;margin:0 auto;background:linear-gradient(180deg,var(--chassis-hi),var(--chassis) 120px);border-radius:18px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07);display:grid;gap:16px;
+  grid-template-columns:minmax(250px,290px) minmax(300px,440px) minmax(0,1fr);
+  grid-template-areas:"fx lcd lcd" "ctl pads edit" "seq seq seq"}
+.sec{background:var(--plate);border-radius:10px;padding:12px;min-width:0;box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+.lbl{font-family:var(--f-display);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mute);font-weight:600}
+.h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.brand{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;font-size:15px}
+.brand small{display:block;font-weight:500;font-size:9.5px;letter-spacing:.2em;color:var(--ink-faint)}
+
+/* LCD */
+.lcdwrap{grid-area:lcd;display:flex;flex-direction:column;gap:8px}
+.lcd{background:var(--lcd-bg);border-radius:6px;border:2px solid #0b0b0c;box-shadow:inset 0 0 22px rgba(255,140,0,.08),inset 0 2px 8px rgba(0,0,0,.8);padding:8px 12px 10px;font-family:var(--f-lcd);color:var(--lcd-ink);position:relative;overflow:hidden;min-height:170px;display:flex;flex-direction:column;gap:4px}
+.lcd::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);pointer-events:none}
+.lrow{display:flex;justify-content:space-between;gap:10px;font-size:22px;line-height:1;white-space:nowrap;overflow:hidden}
+.lrow span{overflow:hidden;text-overflow:ellipsis;white-space:pre}
+.lrow.small{font-size:18px;color:var(--lcd-ink)}
+.lrow .dim{color:var(--lcd-dim)}
+#wave{width:100%;height:96px;display:block;cursor:ew-resize;touch-action:none}
+.meters{display:flex;gap:3px;flex-direction:column;width:90px}
+.meter{height:5px;background:var(--lcd-dim);opacity:.6;position:relative}
+.meter i{position:absolute;inset:0 auto 0 0;background:var(--lcd-ink);width:0}
+.lcdmsg{color:var(--lcd-ink)}
+.toprow{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+
+/* buttons */
+.btn{background:linear-gradient(180deg,#3a3e46,#2c2f35);border:0;border-radius:6px;padding:7px 9px;font-family:var(--f-display);font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);cursor:pointer;box-shadow:0 2px 0 #15171a,inset 0 1px 0 rgba(255,255,255,.08);position:relative;min-height:32px;touch-action:manipulation}
+.btn:active{transform:translateY(1px);box-shadow:0 1px 0 #15171a}
+.btn:focus-visible,.pad:focus-visible,.knob:focus-visible,.cell:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.btn.on{color:#1a1206;background:linear-gradient(180deg,#ffc560,var(--amber));box-shadow:0 0 14px var(--amber-glow),0 2px 0 #7a4f10}
+.btn.rec.on{background:linear-gradient(180deg,#ff7a6c,var(--red));box-shadow:0 0 14px rgba(255,90,74,.6),0 2px 0 #6b1d15;color:#fff}
+.btn.blink{animation:blink .5s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.btn.led::before{content:"";position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;background:#555}
+.btn.led.has::before{background:var(--amber)}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg .btn{flex:1;padding:6px 4px;min-width:0}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* knobs */
+.knobs{display:flex;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.knob{display:flex;flex-direction:column;align-items:center;gap:4px;width:62px;cursor:ns-resize;touch-action:none;user-select:none;border-radius:6px}
+.kd{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#4a4f57,#24272c 70%);box-shadow:0 3px 6px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.12);position:relative}
+.kd::before{content:"";position:absolute;left:50%;top:5px;width:3px;height:13px;margin-left:-1.5px;border-radius:2px;background:var(--white-led)}
+.kring{position:absolute;inset:-5px;border-radius:50%;pointer-events:none}
+.knob .kl{font-family:var(--f-display);font-size:9.5px;letter-spacing:.12em;color:var(--ink-mute);font-weight:600;text-transform:uppercase;white-space:nowrap}
+.knob .kv{font-family:var(--f-lcd);font-size:16px;color:var(--amber);line-height:1;min-height:16px;white-space:nowrap}
+.knob.big{width:74px}.knob.big .kd{width:54px;height:54px}
+
+/* pads */
+.padsec{grid-area:pads;display:flex;flex-direction:column;gap:10px}
+.pads{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;aspect-ratio:1/1;max-width:100%}
+.pad{background:linear-gradient(180deg,#d8d5cc,var(--rubber));border-radius:9px;border:0;position:relative;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;box-shadow:0 4px 0 #6d6a63,0 6px 10px rgba(0,0,0,.45),inset 0 0 0 3px rgba(0,0,0,0);padding:7px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;color:#2a2a2a;transition:box-shadow .06s,transform .06s;min-width:0;overflow:hidden}
+.pad.empty{background:linear-gradient(180deg,#a9a69e,var(--rubber-dim));box-shadow:0 4px 0 #55534e,0 6px 10px rgba(0,0,0,.45)}
+.pad .pn{font-family:var(--f-display);font-weight:700;font-size:12px;opacity:.55}
+.pad .pnm{font-family:var(--f-body);font-weight:600;font-size:11.5px;line-height:1.05;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.8}
+.pad .led{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:#77746c}
+.pad[data-bus="1"] .led{background:#9a7a46}.pad[data-bus="2"] .led{background:#4d8c86}
+.pad.hit{transform:translateY(3px);box-shadow:0 1px 0 #6d6a63,0 2px 4px rgba(0,0,0,.45)}
+.pad.play{box-shadow:0 4px 0 #6d6a63,0 0 0 2px var(--white-led),0 0 22px rgba(244,241,230,.55)}
+.pad.play[data-bus="1"]{box-shadow:0 4px 0 #6d6a63,0 0 0 2px var(--amber),0 0 24px var(--amber-glow)}
+.pad.play[data-bus="2"]{box-shadow:0 4px 0 #6d6a63,0 0 0 2px var(--teal),0 0 24px var(--teal-glow)}
+.pad.play .led{background:var(--white-led);box-shadow:0 0 8px var(--white-led)}
+.pad.play[data-bus="1"] .led{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.pad.play[data-bus="2"] .led{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.pad.sel::after{content:"";position:absolute;left:7px;right:7px;bottom:5px;height:3px;border-radius:2px;background:#2a2a2a;opacity:.7}
+.pad.target{animation:blink .4s steps(2) infinite}
+.pad.drop{outline:3px dashed var(--amber);outline-offset:2px}
+.banks{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}
+.banks .btn{padding:6px 0;min-height:30px}
+.banks .btn.inpat:not(.on){box-shadow:inset 0 -3px 0 var(--teal),0 2px 0 #15171a}
+
+.fx{grid-area:fx}
+.fxlist{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;margin-bottom:12px}
+.fxlist .btn{font-size:10px;padding:6px 4px;text-align:left;letter-spacing:.06em}
+.ctl{grid-area:ctl}
+.edit{grid-area:edit}
+.seqsec{grid-area:seq}
+.pgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.pgrid .btn{padding:5px 0;min-height:28px;font-size:11px}
+.pgrid .btn.queued{outline:2px solid var(--amber);outline-offset:-2px}
+
+.numrow{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.bigtempo{font-family:var(--f-lcd);font-size:34px;color:var(--amber);line-height:.9;cursor:ns-resize;touch-action:none;user-select:none;min-width:84px}
+.hint{color:var(--ink-faint);font-size:12px;line-height:1.35}
+.hint kbd{font-family:var(--f-lcd);font-size:15px;color:var(--ink-mute);background:#15171a;border-radius:3px;padding:0 4px}
+
+/* seq grid */
+.seqwrap{overflow-x:auto;padding-bottom:4px}
+.sgrid{display:grid;gap:2px;min-width:max-content}
+.slabel{font-family:var(--f-body);font-size:12px;color:var(--ink-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px;display:flex;align-items:center;gap:6px;cursor:pointer;width:120px}
+.slabel b{font-family:var(--f-display);color:var(--ink-faint);font-size:10px;width:16px}
+.slabel.sel{color:var(--amber)}
+.cell{width:22px;height:20px;border-radius:3px;background:#2b2e34;border:0;padding:0;cursor:pointer}
+.cell.beat{background:#33373e}
+.cell.on{background:var(--amber);box-shadow:0 0 6px var(--amber-glow)}
+.cell.on.soft{background:#b5822f;box-shadow:none}
+.cell.ph{outline:1px solid var(--white-led);outline-offset:-1px}
+.shead{font-family:var(--f-lcd);font-size:14px;color:var(--ink-faint);text-align:center;width:22px}
+.shead.cur{color:var(--amber)}
+
+.dropnote{font-size:12px;color:var(--ink-faint)}
+.hiddenfile{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#0b0b0c;color:var(--amber);font-family:var(--f-lcd);font-size:20px;padding:8px 14px;border-radius:6px;border:1px solid var(--lcd-dim);z-index:20;pointer-events:none;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+.power{display:flex;align-items:center;gap:8px}
+.pwr{width:10px;height:10px;border-radius:50%;background:#4a2a1c;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.pwr.on{background:var(--red);box-shadow:0 0 10px rgba(255,90,74,.8)}
+.sep{height:1px;background:var(--line);margin:2px 0}
+
+@media (max-width:1020px){
+  .dev{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"lcd lcd" "pads ctl" "edit fx" "seq seq"}
+}
+@media (max-width:700px){
+  body{padding-block:10px 24px}
+  .dev{grid-template-columns:minmax(0,1fr);grid-template-areas:"lcd" "pads" "ctl" "edit" "fx" "seq";padding:12px;gap:12px;border-radius:14px}
+  .lrow{font-size:19px}.lrow.small{font-size:16px}
+  .knob{width:56px}
+}
+@media (prefers-reduced-motion:reduce){.btn.blink,.pad.target{animation:none}.pad{transition:none}}
+</style>
+
+<div class="dev" id="dev">
+  <!-- LCD -->
+  <div class="lcdwrap">
+    <div class="toprow">
+      <div class="brand">CRATE-16<small>WEBASSEMBLY CREATIVE SAMPLER &amp; EFFECTOR</small></div>
+      <div class="power"><span class="lbl" id="engLbl">Tap a pad to power on</span><span class="pwr" id="pwr"></span></div>
+    </div>
+    <div class="lcd" id="lcd">
+      <div class="lrow"><span id="l1">A-01 KICK</span><span id="l1r" class="dim">DRY</span></div>
+      <canvas id="wave" aria-label="Waveform of the selected pad. Drag near the start or end marker to move it."></canvas>
+      <div class="lrow small"><span id="l2">BPM 090.0  PTN 01  STEP --/32</span>
+        <div class="meters" aria-hidden="true"><div class="meter"><i id="mL"></i></div><div class="meter"><i id="mR"></i></div></div></div>
+    </div>
+  </div>
+
+  <!-- FX -->
+  <section class="sec fx" aria-label="Effects">
+    <div class="h"><span class="lbl">Bus FX</span>
+      <div class="seg" style="width:150px"><button class="btn on" id="bus1Btn">Bus 1</button><button class="btn" id="bus2Btn">Bus 2</button></div></div>
+    <div class="fxlist" id="fxList"></div>
+    <div class="knobs" id="fxKnobs"></div>
+  </section>
+
+  <!-- CONTROLS -->
+  <section class="sec ctl stack" aria-label="Transport and pattern">
+    <div class="grid4">
+      <button class="btn" id="playBtn" title="Space">Play</button>
+      <button class="btn rec" id="precBtn" title="Pattern record">P.Rec</button>
+      <button class="btn" id="metroBtn">Click</button>
+      <button class="btn" id="tapBtn">Tap</button>
+    </div>
+    <div class="numrow">
+      <div><div class="lbl">Tempo</div><div class="bigtempo" id="bpmVal" tabindex="0" role="slider" aria-label="Tempo">90.0</div></div>
+      <div id="swingKnob"></div><div id="masterKnob"></div>
+    </div>
+    <div>
+      <div class="h" style="margin-bottom:6px"><span class="lbl">Pattern</span>
+        <div class="seg" style="width:150px" id="lenSeg"></div></div>
+      <div class="pgrid" id="patGrid"></div>
+      <p class="hint" id="patName" style="margin:6px 0 0"></p>
+    </div>
+    <div class="row">
+      <button class="btn" id="rollBtn">Roll</button>
+      <div class="seg" id="rollSeg" style="flex:1"></div>
+    </div>
+    <div class="sep"></div>
+    <div>
+      <div class="h" style="margin-bottom:6px"><span class="lbl">Sampling</span>
+        <div class="seg" style="width:160px"><button class="btn on" id="srcRes">Resample</button><button class="btn" id="srcMic">Mic</button></div></div>
+      <div class="row"><button class="btn rec" id="recBtn" style="flex:1">Rec</button><button class="btn" id="loadBtn" style="flex:1">Import</button></div>
+      <p class="hint" id="recHint" style="margin:8px 0 0">Press Rec, then a pad. Resample records the pattern once through.</p>
+    </div>
+    <input type="file" id="fileIn" class="hiddenfile" accept="audio/*,.wav,.mp3,.aif,.aiff,.flac,.ogg,.m4a" multiple tabindex="-1">
+  </section>
+
+  <!-- PADS -->
+  <section class="padsec" aria-label="Pads">
+    <div class="banks" id="banks"></div>
+    <div class="pads" id="pads"></div>
+    <p class="hint" style="margin:0">Keys <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> · <kbd>Q</kbd>–<kbd>R</kbd> · <kbd>A</kbd>–<kbd>F</kbd> · <kbd>Z</kbd>–<kbd>V</kbd> play pads, <kbd>Space</kbd> plays the pattern. Drop audio files on a pad to load them.</p>
+  </section>
+
+  <!-- PAD EDIT -->
+  <section class="sec edit stack" aria-label="Pad settings">
+    <div class="h" style="margin:0"><span class="lbl" id="editTitle">Pad A-01</span>
+      <div class="row" style="gap:6px"><button class="btn" id="chopBtn">Chop</button><button class="btn" id="exportBtn">Export WAV</button><button class="btn" id="clearPadBtn">Clear</button></div></div>
+    <div class="knobs" id="padKnobs"></div>
+    <div class="seg" id="modeSeg"></div>
+    <div class="row" style="gap:10px">
+      <span class="lbl" style="width:44px">Bus</span><div class="seg" id="busSeg" style="flex:1"></div>
+    </div>
+    <div class="row" style="gap:10px">
+      <span class="lbl" style="width:44px">Mute</span><div class="seg" id="grpSeg" style="flex:1"></div>
+    </div>
+    <div class="row" style="gap:10px">
+      <span class="lbl" style="width:44px">Sync</span>
+      <button class="btn" id="syncBtn">BPM Sync</button>
+      <div id="syncKnobHost"></div>
+      <span class="hint" style="flex:1;min-width:120px">Varispeed follows tempo from the loop's original BPM.</span>
+    </div>
+    <div class="row" id="chopRow" hidden style="gap:6px">
+      <span class="lbl">Chop into</span>
+      <button class="btn" data-chop="4">4</button><button class="btn" data-chop="8">8</button><button class="btn" data-chop="16">16</button>
+      <button class="btn on" id="chopMode">Transient</button>
+    </div>
+  </section>
+
+  <!-- SEQUENCER -->
+  <section class="sec seqsec" aria-label="Pattern grid">
+    <div class="h"><span class="lbl" id="seqTitle">Pattern 01 · Bank A</span>
+      <div class="row" style="gap:6px"><button class="btn" id="erasePadBtn">Erase pad</button><button class="btn" id="clrPatBtn">Clear pattern</button></div></div>
+    <div class="seqwrap"><div class="sgrid" id="sgrid"></div></div>
+    <p class="hint" style="margin:8px 0 0">Click a cell to place a hit, Shift-click for a soft hit. Teal-marked banks also play in this pattern. With P.Rec on, pads you play are quantized to 16ths.</p>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+const WASM_B64 = "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QbDDAEgEQEHQwwJBgMQCQQFBARAAAAsjWUEANgIAI1kjFSIBNgIAIAEgABA3IQAjWUEEaiRZIAALwwEBAn8jWUEEayRZI1lBsMMASARAQdDDAkGAxAJBAUEBEAAACyNZQQA2AgAgABA2I1kjFCIBNgIAIAEgABA3BEAjWSMVIgE2AgAgASAAEDchAiNZIxQiATYCACABIAAQNyACRwRAI1kjFSIBNgIAIAEgABA3EAgLI1kjFCIBNgIAIAEgABA3EAgLI1kjFCIBNgIAIAEgAEEAEC4jWSMVIgE2AgAgASAAQQAQLiNZIxYiATYCACABIABBABAuI1lBBGokWQuZBAECfyNZQQhrJFkjWUGwwwBIBEBB0MMCQYDEAkEBQQEQAAALI1lCADcDACNZIxYiAzYCACADIAAQMyEDAkACQAJAAkACQAJAAkACQAJAAkACQAJAAkACQCABDg0AAQIDBAUGBwgJCgsMDQsjWSMXIgE2AgAgASAAIAL8AiIBIANBAmsiBCABIARIGyIBQQAgAUEAThsQLgwMCyNZIxgiATYCACABIABBASAC/AIiASADIAEgA0gbIgEgAUEATBsQLgwLCyNZIxkiATYCACABIAAgArYQMQwKCyNZIxoiATYCACABIAAgArYQMQwJCyNZIxsiATYCACABIAAgArYQMQwICyNZIxwiATYCACABIAAgAvwCEC4MBwsjWSMdIgE2AgAgASAAIAL8AhAuI1kjHSIBNgIAIAEgABAzGgwGCyNZIx4iATYCACABIAAgAvwCEC4MBQsjWSMfIgE2AgAgASAAIAL8AhAuDAQLI1kjICIBNgIAIAEgACAC/AIQLgwDCyNZIyEiATYCACABIAAgArYQMQwCCyNZIyIiATYCACABIAAgArYQMQwBCyNZIyMiATYCACABIAAgArYQMQsjWSMYIgE2AgAgASAAEDMhASNZIxciBDYCACABIAQgABAzQQFqTARAI1kjGCIBNgIAI1kjFyIENgIEIAEgACADIAQgABAzQQJqIgAgACADShsQLgsjWUEIaiRZC38BAn8jWUEEayRZI1lBsMMASARAQdDDAkGAxAJBAUEBEAAACyNZQQA2AgADQCABQSBIBEAjWSMkIgI2AgAgAiABEDMgAEYEfyNZIygiAjYCACACIAEQM0EDRwVBAAsEQCNZQQRqJFlBAQ8L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";
+
+/* ═════════════ engine host: runs inside the AudioWorklet (or main thread fallback) ═════════════ */
+const HOST_SRC = String.raw`
+class Host {
+  constructor(mod, sr, post){
+    if (!(mod instanceof WebAssembly.Module)) mod = new WebAssembly.Module(mod);
+    this.w = new WebAssembly.Instance(mod, {env:{abort(){}}}).exports;
+    this.w.init(sr); this.sr = sr; this.post = post; this.cnt = 0; this.rec = null; this.sel = 0;
+  }
+  msg(m){
+    if (Array.isArray(m)) { for (const x of m) this.msg(x); return; }
+    const w = this.w;
+    switch (m.t) {
+      case 'load': { const st = m.R ? 1 : 0; const n = m.L.length; const p = w.padAlloc(m.pad, n, st);
+        new Float32Array(w.memory.buffer, p, n).set(m.L);
+        if (st) new Float32Array(w.memory.buffer, w.padRPtr(m.pad), n).set(m.R); break; }
+      case 'clear': w.padClear(m.pad); break;
+      case 'p': w.setParam(m.pad, m.id, m.v); break;
+      case 'on': w.padOn(m.pad, m.v); break;
+      case 'off': w.padOff(m.pad); break;
+      case 'step': w.setStep(m.pat, m.s, m.pad, m.v); break;
+      case 'clrpat': w.clearPattern(m.pat); break;
+      case 'patlen': w.setPatLen(m.pat, m.v); break;
+      case 'pat': w.selectPattern(m.v); break;
+      case 'play': w.setPlay(m.v); break;
+      case 'rec': w.setRec(m.v); break;
+      case 'bpm': w.setBpm(m.v); break;
+      case 'swing': w.setSwing(m.v); break;
+      case 'metro': w.setMetro(m.v); break;
+      case 'roll': w.setRoll(m.on, m.div); break;
+      case 'master': w.setMaster(m.v); break;
+      case 'fx': w.setFx(m.bus, m.v); break;
+      case 'fxp': w.setFxParam(m.bus, m.i, m.v); break;
+      case 'stopall': w.stopAll(); break;
+      case 'sel': this.sel = m.pad; break;
+      case 'srec': this.rec = {src:m.src, L:[], R:[], n:0, max:Math.floor(this.sr*m.max)}; break;
+      case 'srecstop': this.finish(); break;
+    }
+  }
+  render(inL, inR, oL, oR, n){
+    const w = this.w;
+    w.process(n);
+    const buf = w.memory.buffer;
+    oL.set(new Float32Array(buf, w.outLPtr(), n));
+    if (oR !== oL) oR.set(new Float32Array(buf, w.outRPtr(), n));
+    const r = this.rec;
+    if (r) {
+      const a = r.src === 'mic' ? inL : oL, b = r.src === 'mic' ? (inR || inL) : oR;
+      if (a) { r.L.push(a.slice(0, n)); r.R.push((b || a).slice(0, n)); r.n += n; }
+      if (r.n >= r.max) this.finish();
+    }
+    const ec = w.recEvCount();
+    if (ec) { const ev = Array.from(new Int32Array(buf, w.recEvPtr(), ec * 4)); w.recEvReset(); this.post({t:'recev', ev}); }
+    this.cnt += n;
+    if (this.cnt >= this.sr / 30) {
+      this.cnt = 0;
+      const active = []; let ph = -1;
+      for (let v = 0; v < 32; v++) { const p = w.voicePad(v); if (p >= 0) { if (active.indexOf(p) < 0) active.push(p); if (p === this.sel) ph = w.voicePos(v); } }
+      this.post({t:'stat', step:w.getCurStep(), pat:w.getCurPat(), np:w.getNextPat(), active, ph, pk:[w.getPeakL(), w.getPeakR()], recn: this.rec ? this.rec.n : -1});
+    }
+  }
+  finish(){
+    const r = this.rec; if (!r) return; this.rec = null;
+    const L = new Float32Array(r.n), R = new Float32Array(r.n); let o = 0;
+    for (let i = 0; i < r.L.length; i++) { L.set(r.L[i], o); R.set(r.R[i], o); o += r.L[i].length; }
+    this.post({t:'recdone', L, R}, [L.buffer, R.buffer]);
+  }
+}`;
+const WORKLET_SRC = HOST_SRC + String.raw`
+class CrateProc extends AudioWorkletProcessor {
+  constructor(o){ super();
+    this.h = new Host(o.processorOptions.bytes, sampleRate, (m, tr) => this.port.postMessage(m, tr || []));
+    this.port.onmessage = e => this.h.msg(e.data);
+    this.port.postMessage({t:'ready'});
+  }
+  process(inputs, outputs){
+    const o = outputs[0], i = inputs[0] || [];
+    this.h.render(i[0], i[1], o[0], o[1] || o[0], o[0].length);
+    return true;
+  }
+}
+registerProcessor('crate-engine', CrateProc);`;
+
+/* ═════════════ constants ═════════════ */
+const NB = 10, NP = 160, NPAT = 16, NSTEP = 64;
+const BANKS = "ABCDEFGHIJ";
+const FX = [
+  {n:'Bypass', c:[]},
+  {n:'Filter+Drive', c:['Cutoff','Reso','Drive'], d:[0.3,0.35,0.15]},
+  {n:'Lo-Fi', c:['Rate','Bits','Tone'], d:[0.45,0.55,0.35]},
+  {n:'Delay', c:['Time','Feedbk','Level'], d:[0.66,0.4,0.35]},
+  {n:'Reverb', c:['Size','Damp','Level'], d:[0.55,0.45,0.3]},
+  {n:'Isolator', c:['Low','Mid','High'], d:[0.5,0.5,0.5]},
+  {n:'Chorus', c:['Rate','Depth','Level'], d:[0.3,0.5,0.5]},
+  {n:'Compressor', c:['Sustain','Release','Output'], d:[0.45,0.3,0.3]},
+  {n:'Vinyl Sim', c:['Noise','Wow','Tone'], d:[0.35,0.3,0.35]},
+  {n:'Slicer', c:['Rate','Depth','Pattern'], d:[0.4,0.85,0.1]},
+  {n:'DJFX Looper', c:['Length','Speed','Loop'], d:[0.45,0.75,0]},
+];
+const DIVN = ['1/32','1/16T','1/16','1/8T','1/16D','1/8','1/4T','1/8D','1/4','1/4D','1/2'];
+function fxFmt(t, i, v){
+  if (t === 1 && i === 0) { if (v > 0.485 && v < 0.515) return 'FLAT';
+    if (v < 0.5) { const f = 40 * Math.pow(500, v / 0.485); return 'LP ' + hz(f); }
+    const f = 20 * Math.pow(400, (v - 0.515) / 0.485); return 'HP ' + hz(f); }
+  if (t === 3 && i === 0) return DIVN[Math.min(10, Math.floor(v * 10.99))];
+  if (t === 9 && i === 0) return ['1/32','1/16','1/8','1/4'][Math.min(3, Math.floor(v * 3.99))];
+  if (t === 9 && i === 2) return 'PTN ' + (Math.min(7, Math.floor(v * 7.99)) + 1);
+  if (t === 10 && i === 0) return ['1/64','1/32','1/16','1/8','1/4','1/2'][Math.min(5, Math.floor(v * 5.99))];
+  if (t === 10 && i === 1) { const r = v >= 0.5 ? Math.pow(2, (v - 0.75) * 4) : -Math.pow(2, (0.25 - v) * 4); return (r < 0 ? 'REV ' : '') + Math.abs(r).toFixed(2) + 'x'; }
+  if (t === 10 && i === 2) return v > 0.5 ? 'ON' : 'OFF';
+  if (t === 2 && i === 1) return Math.round(16 - v * 13) + 'BIT';
+  if (t === 5) { if (v < 0.02) return 'KILL'; const g = v < 0.5 ? (v / 0.5) ** 2 : 1 + (v - 0.5) * 2; return (20 * Math.log10(g)).toFixed(1) + 'dB'; }
+  return Math.round(v * 100);
+}
+function hz(f){ return f >= 1000 ? (f / 1000).toFixed(1) + 'k' : Math.round(f) + ''; }
+
+/* ═════════════ state ═════════════ */
+const S = {
+  bank: 0, sel: 0, pads: [], pats: [], cur: 0, queued: -1, bpm: 90, swing: 0.16, playing: false, prec: false,
+  metro: false, roll: false, rollDiv: 1, master: 0.85, fxBus: 1,
+  fx: { 1: {t: 8, c: [0.35, 0.3, 0.35]}, 2: {t: 4, c: [0.55, 0.45, 0.3]} },
+  recArm: false, recTarget: -1, recSrc: 'resample', step: -1, active: new Set(), ph: -1, chopMode: 'transient'
+};
+for (let i = 0; i < NP; i++) S.pads.push(emptyPad());
+for (let i = 0; i < NPAT; i++) S.pats.push({len: 16, d: new Uint8Array(NSTEP * NP)});
+function emptyPad(){ return {name:'', L:null, R:null, start:0, end:0, pitch:0, vol:0.8, pan:0, loop:0, gate:0, rev:0, group:0, bus:0, atk:0, rel:0.05, sync:0, peaks:null}; }
+
+/* ═════════════ audio boot ═════════════ */
+let ctx = null, node = null, host = null, ready = false, sp = null;
+const queue = [];
+function send(m){ if (ready) { if (node) node.port.postMessage(m); else host.msg(m); } else queue.push(m); }
+function sendT(m, tr){ if (ready) { if (node) node.port.postMessage(m, tr); else host.msg(m); } else queue.push(m); }
+try { ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint: 'interactive'}); } catch (e) { ctx = null; }
+const SR = ctx ? ctx.sampleRate : 48000;
+const wasmBytes = Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0));
+let booting = null;
+
+function onHost(m){
+  if (m.t === 'ready') return;
+  if (m.t === 'stat') return onStat(m);
+  if (m.t === 'recev') { for (let i = 0; i < m.ev.length; i += 4) { const [pat, st, pad, vel] = m.ev.slice(i, i + 4); S.pats[pat].d[st * NP + pad] = vel; } drawSeq(); markPatterns(); return; }
+  if (m.t === 'recdone') return onRecDone(m.L, m.R);
+}
+async function boot(){
+  if (!ctx) { toast('WEB AUDIO UNAVAILABLE'); return; }
+  try {
+    const url = URL.createObjectURL(new Blob([WORKLET_SRC], {type: 'application/javascript'}));
+    try { await ctx.audioWorklet.addModule(url); }
+    catch (e) { await ctx.audioWorklet.addModule('data:application/javascript;base64,' + btoa(WORKLET_SRC)); }
+    node = new AudioWorkletNode(ctx, 'crate-engine', {numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: {bytes: wasmBytes.buffer.slice(0)}});
+    node.port.onmessage = e => onHost(e.data);
+    node.connect(ctx.destination);
+    $('engLbl').textContent = 'WASM · AudioWorklet · ' + (SR / 1000) + 'kHz';
+  } catch (e) {
+    // fallback: run the same wasm engine on the main thread
+    const mod = await WebAssembly.compile(wasmBytes);
+    const Host = new Function(HOST_SRC + '; return Host;')();
+    host = new Host(mod, SR, m => onHost(m));
+    sp = ctx.createScriptProcessor(1024, 2, 2);
+    sp.onaudioprocess = ev => { const ib = ev.inputBuffer, ob = ev.outputBuffer;
+      host.render(ib.getChannelData(0), ib.getChannelData(1), ob.getChannelData(0), ob.getChannelData(1), ob.length); };
+    sp.connect(ctx.destination); node = null;
+    $('engLbl').textContent = 'WASM · main thread · ' + (SR / 1000) + 'kHz';
+  }
+  ready = true;
+  for (const m of queue.splice(0)) send(m);
+  $('pwr').classList.add('on');
+}
+function ensureAudio(){
+  if (!ctx) return;
+  if (ctx.state !== 'running') ctx.resume();
+  if (!booting) booting = boot();
+}
+
+/* ═════════════ default kit (synthesized at the context sample rate) ═════════════ */
+function buildKit(){
+  const sr = SR, rnd = () => Math.random() * 2 - 1, TAU = Math.PI * 2;
+  const F = s => new Float32Array(Math.max(2, Math.floor(s * sr)));
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  const lp1 = (b, fc) => { const a = 1 - Math.exp(-TAU * fc / sr); let z = 0; for (let i = 0; i < b.length; i++) { z += (b[i] - z) * a; b[i] = z; } return b; };
+  const hp1 = (b, fc) => { const a = 1 - Math.exp(-TAU * fc / sr); let z = 0; for (let i = 0; i < b.length; i++) { z += (b[i] - z) * a; b[i] -= z; } return b; };
+  const bp = (b, fc, q) => { const w = TAU * fc / sr, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
+    const b0 = al / a0, b2 = -al / a0, a1 = -2 * c / a0, a2 = (1 - al) / a0; let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < b.length; i++) { const x = b[i]; const y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; b[i] = y; } return b; };
+  const norm = (b, pk = 0.9) => { let m = 0; for (const x of b) m = Math.max(m, Math.abs(x)); if (m > 0) for (let i = 0; i < b.length; i++) b[i] *= pk / m; return b; };
+  const fadeOut = (b, s = 0.01) => { const n = Math.min(b.length, Math.floor(s * sr)); for (let i = 0; i < n; i++) b[b.length - 1 - i] *= i / n; return b; };
+
+  const kick = (f0, f1, dec, cl) => { const b = F(dec * 2.4); let ph = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; const f = f1 + (f0 - f1) * Math.exp(-t * 28); ph += TAU * f / sr;
+      b[i] = Math.tanh(1.6 * Math.sin(ph) * Math.exp(-t / dec)) + (t < 0.005 ? rnd() * cl * (1 - t / 0.005) : 0); } return fadeOut(norm(b)); };
+  const snare = () => { const b = F(0.35), n = F(0.35); for (let i = 0; i < n.length; i++) n[i] = rnd(); hp1(n, 900); bp(n, 3500, 0.6); let ph = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * (190 - 30 * Math.min(1, t * 20)) / sr;
+      b[i] = Math.sin(ph) * Math.exp(-t / 0.05) * 0.7 + n[i] * 1.6 * Math.exp(-t / 0.09); } return fadeOut(norm(b)); };
+  const hat = dec => { const b = F(dec * 4); const fr = [205.3, 304.4, 369.6, 522.7, 540, 800]; const ph = fr.map(() => Math.random());
+    for (let i = 0; i < b.length; i++) { let s = 0; for (let k = 0; k < 6; k++) { ph[k] += fr[k] * 1.8 / sr; s += (ph[k] % 1) < 0.5 ? 1 : -1; } b[i] = s * 0.15 + rnd() * 0.4; }
+    bp(b, 9000, 0.9); hp1(b, 6000); for (let i = 0; i < b.length; i++) b[i] *= Math.exp(-(i / sr) / dec); return fadeOut(norm(b, 0.7)); };
+  const clap = () => { const b = F(0.45); for (let i = 0; i < b.length; i++) { const t = i / sr; let e = 0;
+      for (const o of [0, 0.011, 0.022]) if (t >= o) e = Math.max(e, Math.exp(-(t - o) / 0.006)); e = Math.max(e, t > 0.03 ? Math.exp(-(t - 0.03) / 0.13) * 0.6 : 0); b[i] = rnd() * e; }
+    bp(b, 1300, 1.1); return fadeOut(norm(b)); };
+  const rim = () => { const b = F(0.08); let p = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; p += TAU * 1700 / sr; b[i] = (Math.sin(p) * 0.6 + rnd() * 0.5) * Math.exp(-t / 0.012); } bp(b, 2200, 1.5); return norm(b, 0.8); };
+  const tom = f => { const b = F(0.7); let ph = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * (f * (1 + 0.6 * Math.exp(-t * 18))) / sr; b[i] = Math.sin(ph) * Math.exp(-t / 0.18) + rnd() * 0.05 * Math.exp(-t / 0.01); } return fadeOut(norm(b, 0.85)); };
+  const shaker = () => { const b = F(0.16); for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] = rnd() * Math.min(1, t / 0.025) * Math.exp(-Math.max(0, t - 0.025) / 0.04); } hp1(b, 5000); return norm(b, 0.6); };
+  const cowbell = () => { const b = F(0.5); let a = 0, c = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; a += 545 / sr; c += 815 / sr; b[i] = ((a % 1 < 0.5 ? 1 : -1) + (c % 1 < 0.5 ? 1 : -1)) * (0.6 * Math.exp(-t / 0.03) + 0.4 * Math.exp(-t / 0.18)); } bp(b, 1000, 1.2); return fadeOut(norm(b, 0.7)); };
+  const crash = () => { const b = F(2.4); for (let i = 0; i < b.length; i++) b[i] = rnd(); hp1(b, 3500); bp(b, 7000, 0.4); for (let i = 0; i < b.length; i++) b[i] *= Math.exp(-(i / sr) / 0.7); return fadeOut(norm(b, 0.6), 0.2); };
+  const sub = () => { const b = F(1.4); const f = mtof(29 + 12); let ph = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * f * (1 + 0.25 * Math.exp(-t * 30)) / sr; b[i] = Math.tanh(2.2 * Math.sin(ph)) * Math.exp(-t / 0.55); } return fadeOut(norm(b, 0.85)); };
+  const blip = () => { const b = F(0.18); let ph = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * (1900 * Math.exp(-t * 14) + 500) / sr; b[i] = Math.sin(ph) * Math.exp(-t / 0.04); } return norm(b, 0.6); };
+  const snap = () => { const b = F(0.15); for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] = rnd() * Math.exp(-t / 0.018); } bp(b, 2600, 2.5); return norm(b, 0.75); };
+  const vinyl = sec => { const b = F(sec); let z = 0; for (let i = 0; i < b.length; i++) { z += (rnd() - z) * 0.05; let c = 0; if (Math.random() < 0.0009) c = rnd() * 0.9; b[i] = z * 0.12 + c; } hp1(b, 300); lp1(b, 6500); return b; };
+
+  const ep = (notes, sec) => { const L = F(sec), R = F(sec);
+    notes.forEach((m, k) => { const f = mtof(m); for (const [buf, det] of [[L, 0.9994], [R, 1.0006]]) { let pc = Math.random(), pm = 0; const ff = f * det;
+      for (let i = 0; i < buf.length; i++) { const t = i / sr; pm += TAU * ff / sr; pc += TAU * ff / sr;
+        const idx = 1.6 * Math.exp(-t * 4.5) + 0.25; const mod = Math.sin(pm) * idx;
+        const env = (1 - Math.exp(-t * 400)) * Math.exp(-t * 1.25);
+        buf[i] += (Math.sin(pc + mod) + 0.12 * Math.sin(pc * 4 + mod) * Math.exp(-t * 12)) * env * (0.9 - k * 0.06); } } });
+    norm(L, 0.8); norm(R, 0.8); fadeOut(L, 0.05); fadeOut(R, 0.05); return [L, R]; };
+  const bass = (m) => { const b = F(0.95); const f = mtof(m); let ph = 0, z = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; ph += f / sr; const p = ph % 1; const saw = 2 * p - 1;
+      const fc = 180 + 1400 * Math.exp(-t * 14); const a = 1 - Math.exp(-TAU * fc / sr); z += (saw - z) * a;
+      b[i] = (z * 0.8 + Math.sin(TAU * ph) * 0.7) * Math.min(1, t * 300) * Math.exp(-t / 0.45); } return fadeOut(norm(b, 0.85), 0.03); };
+  const padSyn = (notes, sec) => { const L = F(sec), R = F(sec);
+    notes.forEach(m => { const f = mtof(m); [-0.12, 0.0, 0.12].forEach((d, j) => { const ff = f * Math.pow(2, d / 12); let p = Math.random(); const tgt = j === 0 ? L : (j === 2 ? R : null);
+      for (let i = 0; i < L.length; i++) { p += ff / sr; const s = (2 * (p % 1) - 1) * 0.3; if (tgt) tgt[i] += s; else { L[i] += s * 0.7; R[i] += s * 0.7; } } }); });
+    lp1(lp1(L, 1400), 1800); lp1(lp1(R, 1400), 1800); norm(L, 0.7); norm(R, 0.7); return [L, R]; };
+  const vox = (f1, f2, f3, m, sec) => { const b = F(sec); const f = mtof(m); let p = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; p += f * (1 + 0.012 * Math.sin(TAU * 5.2 * t) * Math.min(1, t * 2)) / sr; b[i] = (2 * (p % 1) - 1) + rnd() * 0.05; }
+    const a = bp(Float32Array.from(b), f1, 6), c = bp(Float32Array.from(b), f2, 8), d = bp(Float32Array.from(b), f3, 10);
+    for (let i = 0; i < b.length; i++) b[i] = a[i] + c[i] * 0.6 + d[i] * 0.25; return fadeOut(norm(b, 0.8), 0.08); };
+
+  const P = (i, name, L, opt = {}, R = null) => { const p = Object.assign(emptyPad(), {name, L, R, end: L.length}, opt); S.pads[i] = p; };
+  // Bank A — drums
+  P(0, 'KICK', kick(150, 46, 0.32, 0.7)); P(1, 'KICK TIGHT', kick(190, 55, 0.18, 1));
+  P(2, 'SNARE', snare()); P(3, 'CLAP', clap(), {vol: 0.7});
+  P(4, 'HAT CLOSED', hat(0.035), {group: 1, vol: 0.55, pan: 0.15}); P(5, 'HAT OPEN', hat(0.32), {group: 1, vol: 0.5, pan: 0.15});
+  P(6, 'SHAKER', shaker(), {vol: 0.5, pan: -0.25}); P(7, 'RIM', rim(), {vol: 0.6, pan: -0.1});
+  P(8, 'TOM LOW', tom(105), {pan: -0.3}); P(9, 'TOM HIGH', tom(160), {pan: 0.3});
+  P(10, 'COWBELL', cowbell(), {vol: 0.5}); P(11, 'CRASH', crash(), {vol: 0.55, bus: 2});
+  P(12, 'SUB F', sub(), {vol: 0.75}); P(13, 'BLIP', blip(), {bus: 2, vol: 0.5}); P(14, 'SNAP', snap(), {bus: 2, vol: 0.6});
+  const barS = 4 * 60 / 90;
+  P(15, 'VINYL BED', vinyl(barS * 2), {loop: 1, sync: 90, vol: 0.55});
+  // Bank B — keys & bass in F minor
+  const chords = [['Fm9', [53, 56, 60, 63, 67]], ['Ebmaj9', [51, 55, 58, 62, 65]], ['Dbmaj9', [49, 53, 56, 60, 63]], ['C7#9', [48, 52, 58, 63]],
+    ['Bbm9', [46, 49, 53, 56, 60]], ['Abmaj7', [44, 48, 51, 55]], ['Gm7b5', [43, 46, 49, 53]], ['C7sus', [48, 53, 55, 58]]];
+  chords.forEach(([n, notes], k) => { const [L, R] = ep(notes, 2.4); P(16 + k, 'KEYS ' + n, L, {bus: 1, vol: 0.62}, R); });
+  [['F', 41], ['Eb', 39], ['Db', 37], ['C', 36], ['Bb', 34], ['Ab', 32], ['G', 31], ['C HI', 48]].forEach(([n, m], k) => P(24 + k, 'BASS ' + n, bass(m), {group: 2, vol: 0.7}));
+  // Bank C — loops & tones
+  const [pL, pR] = padSyn([53, 56, 60, 63, 67], 6);
+  P(34, 'PAD Fm9', pL, {gate: 1, atk: 0.35, rel: 0.9, bus: 2, vol: 0.5}, pR);
+  P(35, 'VOX AH', vox(800, 1150, 2900, 60, 1.6), {gate: 1, rel: 0.25, bus: 2, vol: 0.6});
+  P(36, 'VOX OH', vox(450, 800, 2830, 63, 1.6), {gate: 1, rel: 0.25, bus: 2, vol: 0.6});
+  // drum loop rendered from bank A (1 bar @ 90)
+  const loopN = Math.floor(barS * sr), st = 60 / 90 / 4;
+  const DL = new Float32Array(loopN), DR = new Float32Array(loopN);
+  const put = (pad, step, g) => { const p = S.pads[pad]; const o = Math.floor(step * st * sr + (step % 2 ? 0.16 * st * sr : 0)); const pn = (p.pan + 1) * Math.PI / 4;
+    for (let i = 0; i < p.L.length && o + i < loopN; i++) { DL[o + i] += p.L[i] * g * Math.cos(pn); DR[o + i] += p.L[i] * g * Math.sin(pn); } };
+  [0, 7, 10].forEach(s => put(0, s, 0.9)); [4, 12].forEach(s => put(2, s, 0.8)); [3, 15].forEach(s => put(7, s, 0.35));
+  for (let s = 0; s < 16; s += 2) put(4, s, s % 4 ? 0.3 : 0.45);
+  norm(DL, 0.85); norm(DR, 0.85);
+  P(32, 'DRUM LOOP 90', DL, {loop: 1, sync: 90, vol: 0.75}, DR);
+  // keys loop: 2 bars
+  const kN = Math.floor(barS * 2 * sr); const KL = new Float32Array(kN), KR = new Float32Array(kN);
+  [[16, 0], [17, 16], [17, 22]].forEach(([pad, step]) => { const p = S.pads[pad]; const o = Math.floor(step * st * sr); for (let i = 0; i < p.L.length && o + i < kN; i++) { KL[o + i] += p.L[i] * 0.8; KR[o + i] += p.R[i] * 0.8; } });
+  P(33, 'KEYS LOOP 90', KL, {loop: 1, sync: 90, bus: 1, vol: 0.6}, KR);
+
+  // demo patterns
+  const set = (pat, pad, steps, v = 110) => steps.forEach(s => { S.pats[pat].d[s * NP + pad] = v; });
+  for (const pi of [0, 1]) {
+    S.pats[pi].len = 32;
+    set(pi, 0, [0, 7, 10, 16, 23, 26, 30]); set(pi, 2, [4, 12, 20, 28]);
+    for (let s = 0; s < 32; s += 2) S.pats[pi].d[s * NP + 4] = s % 4 ? 70 : 105;
+    set(pi, 5, [14, 30], 90); set(pi, 7, [15], 70); set(pi, 15, [0]);
+  }
+  set(0, 16, [0]); set(0, 17, [16]); set(0, 24, [0, 10]); set(0, 25, [16, 26]);
+  set(1, 18, [0]); set(1, 19, [16]); set(1, 26, [0, 10]); set(1, 27, [16, 22, 26]); set(1, 3, [12, 28], 90); set(1, 1, [14], 80); set(1, 11, [0], 80);
+  S.pats[2].len = 32; set(2, 32, [0, 16]); set(2, 33, [0]); set(2, 12, [0, 10, 16, 26], 90); set(2, 34, [0], 100);
+
+  /* ───────── expansion instruments ───────── */
+  const sat = (b, d) => { for (let i = 0; i < b.length; i++) b[i] = Math.tanh(b[i] * d); return b; };
+  const boom = (m, dec = 1.1) => { const b = F(dec * 2); const f = mtof(m); let ph = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * f * (1 + 1.2 * Math.exp(-t * 35)) / sr; b[i] = Math.sin(ph) * Math.exp(-t / dec) * Math.min(1, t * 600); }
+    return fadeOut(norm(sat(b, 2.2), 0.9), 0.05); };
+  const ks = (m, sec, bright = 4) => { const b = F(sec); const f = mtof(m); const N = Math.max(2, Math.round(sr / f)); const d = new Float32Array(N);
+    for (let i = 0; i < N; i++) d[i] = rnd(); lp1(d, Math.min(sr * 0.4, f * bright * 4)); let p = 0;
+    for (let i = 0; i < b.length; i++) { const cur = d[p], nx = d[(p + 1) % N]; d[p] = (cur + nx) * 0.4985; b[i] = cur; p = (p + 1) % N; }
+    return b; };
+  const strum = (notes, sec, gap = 0.022) => { const L = F(sec), R = F(sec);
+    notes.forEach((m, k) => { const s = ks(m, sec, 3); const o = Math.floor(k * gap * sr); const pn = 0.3 + 0.4 * k / notes.length;
+      for (let i = 0; i + o < L.length; i++) { L[i + o] += s[i] * (1 - pn); R[i + o] += s[i] * pn; } });
+    for (const b of [L, R]) { hp1(b, 90); norm(b, 0.8); fadeOut(b, 0.1); } return [L, R]; };
+  const saws = (notes, sec, cut = 2500, envDec = 0.4, voices = 5, det = 0.18) => { const L = F(sec), R = F(sec);
+    notes.forEach(m => { for (let v = 0; v < voices; v++) { const u = voices > 1 ? v / (voices - 1) : 0.5; const f = mtof(m) * Math.pow(2, (u - 0.5) * 2 * det / 12); let p = Math.random();
+      for (let i = 0; i < L.length; i++) { p += f / sr; if (p >= 1) p -= 1; const s = (2 * p - 1) * 0.25; L[i] += s * (1 - u); R[i] += s * u; } } });
+    for (const b of [L, R]) { let z1 = 0, z2 = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; const fc = 200 + cut * Math.exp(-t / envDec); const a = 1 - Math.exp(-TAU * fc / sr);
+      z1 += (b[i] - z1) * a; z2 += (z1 - z2) * a; b[i] = z2 * Math.min(1, t * 200) * Math.exp(-t / (sec * 0.45)); } norm(b, 0.8); fadeOut(b, 0.05); }
+    return [L, R]; };
+  const fmBell = (m, sec, ratio = 3.5, idx = 3) => { const b = F(sec); const f = mtof(m); let pc = 0, pm = 0;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; pm += TAU * f * ratio / sr; pc += TAU * f / sr; b[i] = Math.sin(pc + Math.sin(pm) * idx * Math.exp(-t * 3)) * Math.exp(-t / (sec * 0.3)) * Math.min(1, t * 2000); }
+    return fadeOut(norm(b, 0.7), 0.05); };
+  const organ = (notes, sec) => { const b = F(sec); notes.forEach(m => { const f = mtof(m); [[1, 1], [2, 0.6], [3, 0.35], [4, 0.25], [0.5, 0.5]].forEach(([h, a]) => { let p = Math.random() * TAU; for (let i = 0; i < b.length; i++) { p += TAU * f * h / sr; b[i] += Math.sin(p) * a; } }); });
+    for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] *= Math.min(1, t * 400) * Math.exp(-t / (sec * 0.35)); } return fadeOut(norm(b, 0.75), 0.03); };
+  const acid = (m, sec = 0.4, res = 0.85) => { const b = F(sec); const f = mtof(m); let p = 0, l = 0, bd = 0; const q = 1 - res;
+    for (let i = 0; i < b.length; i++) { const t = i / sr; p += f / sr; if (p >= 1) p -= 1; const fc = 300 + 3200 * Math.exp(-t / 0.09); const g = 2 * Math.sin(Math.PI * Math.min(fc, sr / 6) / sr);
+      l += g * bd; const h = (2 * p - 1) - l - q * bd; bd += g * h; b[i] = Math.tanh(l * 1.6) * Math.min(1, t * 500) * Math.exp(-t / (sec * 0.6)); }
+    return fadeOut(norm(b, 0.8), 0.02); };
+  const reese = (m, sec = 1.6) => { const L = F(sec), R = F(sec); const f = mtof(m);
+    [L, R].forEach((b, c) => { [-0.25, 0.25, c ? 0.1 : -0.1].forEach(d => { const ff = f * Math.pow(2, d / 12); let p = Math.random(); for (let i = 0; i < b.length; i++) { p += ff / sr; if (p >= 1) p -= 1; b[i] += (2 * p - 1) * 0.4; } });
+      lp1(lp1(b, 650), 900); sat(b, 1.5); for (let i = 0; i < b.length; i++) b[i] *= Math.min(1, i / sr * 150); });
+    let ph = 0; for (let i = 0; i < L.length; i++) { ph += TAU * f / sr; const s = Math.sin(ph) * 0.6; L[i] += s; R[i] += s; }
+    for (const b of [L, R]) { norm(b, 0.8); fadeOut(b, 0.05); } return [L, R]; };
+  const noiseSweep = (sec, f0, f1, shape) => { const b = F(sec); let z1 = 0, z2 = 0;
+    for (let i = 0; i < b.length; i++) { const u = i / b.length; const fc = Math.min(sr * 0.45, f0 * Math.pow(f1 / f0, u)); const a = 1 - Math.exp(-TAU * fc / sr); z1 += (rnd() - z1) * a; z2 += (z1 - z2) * a; b[i] = z2 * shape(u); }
+    return norm(b, 0.75); };
+  const tone = (sec, fn, envFn) => { const b = F(sec); let ph = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * fn(t) / sr; b[i] = Math.sin(ph) * envFn(t); } return b; };
+  const mix = (...bufs) => { const n = Math.max(...bufs.map(([b]) => b.length)); const o = new Float32Array(n); bufs.forEach(([b, g]) => { for (let i = 0; i < b.length; i++) o[i] += b[i] * g; }); return o; };
+  const layer = (a, b, gb = 1) => mix([a, 1], [b, gb]);
+
+  const parse = s => { s = s.replace(/[\s|]/g, ''); const out = []; for (let i = 0; i < s.length; i++) { const c = s[i]; const v = c === 'X' ? 127 : c === 'x' ? 105 : c === 'o' ? 68 : 0; if (v) out.push([i, v]); } return out; };
+  const G = (pat, pad, s) => parse(s).forEach(([st, v]) => { S.pats[pat].d[st * NP + pad] = v; });
+  const renderLoop = (bpmL, steps, hits) => { const st2 = 60 / bpmL / 4; const n = Math.floor(steps * st2 * sr); const L = new Float32Array(n), R = new Float32Array(n);
+    hits.forEach(([pad, step, g]) => { const p = S.pads[pad]; const o = Math.floor(step * st2 * sr); const pn = (p.pan + 1) * Math.PI / 4; const pr = p.R || p.L;
+      for (let i = 0; i < p.L.length && o + i < n; i++) { L[o + i] += p.L[i] * g * Math.cos(pn); R[o + i] += pr[i] * g * Math.sin(pn); } });
+    norm(L, 0.85); norm(R, 0.85); return [L, R]; };
+  const hitsOf = (pad, s, g = 1) => parse(s).map(([st, v]) => [pad, st, g * v / 110]);
+
+  /* ── Bank D · TRAP (48–63) */
+  P(48, '808 KICK', kick(110, 45, 0.45, 0.4), {vol: 0.7});
+  [['F', 29], ['G#', 32], ['A#', 34], ['C', 36], ['D#', 39]].forEach(([n, m], k) => P(49 + k, '808 ' + n, boom(m + 12), {group: 4, vol: 0.68}));
+  P(54, 'SNARE TRAP', layer(snare(), snap(), 0.6), {vol: 0.7}); P(55, 'CLAP 808', clap(), {vol: 0.7});
+  P(56, 'HAT 808', hat(0.028), {group: 3, vol: 0.5, pan: 0.2}); P(57, 'OPEN HAT 808', hat(0.22), {group: 3, vol: 0.45, pan: 0.2});
+  P(58, 'RIM 808', rim(), {vol: 0.55, pan: -0.2}); P(59, 'COWBELL 808', cowbell(), {vol: 0.45, pan: 0.15});
+  P(60, 'CONGA HI', tom(330), {vol: 0.55, pan: 0.35}); P(61, 'CONGA LO', tom(220), {vol: 0.6, pan: -0.35});
+  P(62, 'BELL F', fmBell(77, 1.6, 3.5, 2.5), {bus: 1, vol: 0.45});
+  { const [L, R] = padSyn([53, 60, 65, 68, 72], 3); for (const b of [L, R]) for (let i = 0; i < b.length; i++) { const u = i / b.length; b[i] *= Math.min(1, u * 8) * (1 - u); } P(63, 'CHOIR Fm', L, {bus: 2, vol: 0.5}, R); }
+
+  /* ── Bank E · HOUSE / TECHNO (64–79) */
+  P(64, 'KICK 909', kick(220, 50, 0.28, 1.2));
+  { const k = kick(160, 42, 0.5, 0.5); const r = lp1(lp1(lp1(Float32Array.from(k), 140), 140), 160); const n = Math.floor(sr * 1.1); const o = new Float32Array(n);
+    for (let i = 0; i < k.length && i < n; i++) o[i] += k[i]; for (let tap = 1; tap <= 4; tap++) { const d = Math.floor(tap * 60 / 130 / 4 * sr), g = 0.9 * Math.pow(0.55, tap - 1); for (let i = 0; i < r.length && i + d < n; i++) o[i + d] += r[i] * g; }
+    P(65, 'KICK RUMBLE', fadeOut(norm(sat(o, 1.4)), 0.1), {vol: 0.7}); }
+  P(66, 'CLAP 909', clap(), {bus: 2, vol: 0.65}); P(67, 'HAT 909', hat(0.04), {group: 1, vol: 0.45, pan: -0.15});
+  P(68, 'OPEN HAT 909', hat(0.18), {group: 1, vol: 0.45, pan: -0.15});
+  { const b = hat(0.9); bp(b, 5200, 0.8); P(69, 'RIDE', fadeOut(norm(b, 0.6), 0.1), {vol: 0.4, pan: 0.3}); }
+  P(70, 'SHAKER 16', shaker(), {vol: 0.4, pan: 0.3}); P(71, 'PERC TOM', tom(260), {vol: 0.5, pan: -0.3});
+  [['Am7', [57, 60, 64, 67]], ['Dm7', [50, 57, 60, 65]], ['Em7', [52, 59, 62, 67]], ['Fmaj7', [53, 57, 60, 64]]].forEach(([n, nt], k) => { const [L, R] = saws(nt, 0.6, 3500, 0.12, 3, 0.12); P(72 + k, 'STAB ' + n, L, {bus: 1, vol: 0.55}, R); });
+  P(76, 'ORGAN BASS A', organ([33], 0.6), {group: 2, vol: 0.7}); P(77, 'ORGAN BASS D', organ([38], 0.6), {group: 2, vol: 0.7});
+  P(78, 'ACID A', acid(45), {bus: 1, vol: 0.45});
+  { const r = noiseSweep(4, 300, 12000, u => u * u); const t = tone(4, t => 200 * Math.pow(8, t / 4), t => Math.pow(t / 4, 2) * 0.25); P(79, 'NOISE RISER', norm(layer(r, t), 0.75), {bus: 2, vol: 0.5}); }
+
+  /* ── Bank F · LO-FI / BOOM BAP (80–95) */
+  P(80, 'DUSTY KICK', fadeOut(norm(sat(lp1(kick(120, 48, 0.3, 0.3), 2500), 1.6)), 0.02));
+  { const s = layer(snare(), clap(), 0.7); lp1(s, 6000); P(81, 'BOOMBAP SNARE', norm(sat(s, 1.8)), {vol: 0.7}); }
+  { const b = F(0.14); for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] = rnd() * Math.min(1, t / 0.008) * Math.exp(-t / 0.05); } hp1(b, 3000); lp1(b, 8000); P(82, 'BRUSH HAT', norm(b, 0.55), {vol: 0.5, pan: 0.2}); }
+  { const b = rim(); lp1(b, 3000); P(83, 'SIDESTICK', norm(b, 0.7), {vol: 0.5, pan: -0.15}); }
+  P(84, 'SHAKER SOFT', lp1(shaker(), 7000), {vol: 0.35, pan: 0.35});
+  { const j = hat(0.12); bp(j, 7000, 1.5); P(85, 'TAMBOURINE', norm(layer(shaker(), j, 0.8), 0.6), {vol: 0.4, pan: -0.35}); }
+  [['Cmaj9', [48, 55, 59, 62, 64]], ['Am9', [45, 52, 55, 59, 64]], ['Dm9', [50, 53, 57, 60, 64]], ['G13', [43, 53, 59, 64]]].forEach(([n, nt], k) => { const [L, R] = strum(nt, 2.2); P(86 + k, 'GTR ' + n, L, {bus: 1, vol: 0.6}, R); });
+  [['C', 36], ['A', 33], ['D', 38], ['G', 31]].forEach(([n, m], k) => { const b = ks(m, 1.3, 2); lp1(b, 1100); for (let i = 0; i < b.length; i++) b[i] *= Math.exp(-(i / sr) / 0.5); P(90 + k, 'UPRIGHT ' + n, fadeOut(norm(sat(b, 1.3), 0.85), 0.05), {group: 2, vol: 0.75}); });
+  { const [eL] = ep([53, 57, 60, 64, 67], 2.4); const n = Math.floor(sr * 1.1); const o = new Float32Array(n); let pos = 0;
+    for (let i = 0; i < n; i++) { const rate = Math.max(0, 1 - i / n); const ip = Math.floor(pos); o[i] = (eL[ip] || 0) * Math.min(1, rate * 3); pos += rate; }
+    P(94, 'TAPE STOP', fadeOut(o, 0.02), {bus: 1, vol: 0.6}); }
+  { const [L, R] = ep([53, 57, 60, 64, 67], 2.4); P(95, 'EP Fmaj9', L, {bus: 2, vol: 0.6}, R); }
+
+  /* ── Bank G · SYNTH (96–111) */
+  [['Cm', [48, 55, 60, 63, 67]], ['Ab', [44, 56, 60, 63]], ['Eb', [51, 58, 63, 67]], ['Bb', [46, 58, 62, 65]], ['Fm', [53, 60, 65, 68]], ['Gm', [55, 58, 62, 67]], ['Abmaj7', [44, 55, 60, 63, 67]], ['Gsus', [43, 55, 60, 62]]]
+    .forEach(([n, nt], k) => { const [L, R] = saws(nt, 1.8, 2400, 0.5, 5, 0.2); P(96 + k, 'SAW ' + n, L, {bus: 2, vol: 0.5, rel: 0.3}, R); });
+  [['C4', 60], ['Eb4', 63], ['F4', 65], ['G4', 67], ['Bb4', 70], ['C5', 72], ['Eb5', 75], ['G5', 79]].forEach(([n, m], k) => { const [L, R] = saws([m], 0.45, 4200, 0.08, 2, 0.08); P(104 + k, 'LEAD ' + n, L, {bus: 1, vol: 0.5}, R); });
+
+  /* ── Bank H · FX & TEXTURE (112–127) */
+  P(112, 'RISER', S.pads[79].L.slice(), {bus: 2, vol: 0.55});
+  P(113, 'DOWNLIFTER', noiseSweep(2.5, 10000, 200, u => (1 - u) * (1 - u)), {bus: 2, vol: 0.55});
+  { const k = kick(70, 32, 0.9, 1); const n = noiseSweep(2.5, 2200, 300, u => Math.exp(-u * 6)); P(114, 'IMPACT', fadeOut(norm(layer(k, n, 0.7)), 0.2), {bus: 2, vol: 0.7}); }
+  P(115, 'SUB DROP', fadeOut(norm(sat(tone(1.8, t => 110 * Math.pow(30 / 110, Math.min(1, t / 1.2)), t => Math.exp(-t / 0.9) * Math.min(1, t * 300)), 1.5)), 0.05), {vol: 0.8});
+  P(116, 'LASER', norm(tone(0.35, t => 3500 * Math.exp(-t * 18) + 120, t => Math.exp(-t / 0.12)), 0.6), {bus: 1, vol: 0.5});
+  { const b = F(0.25); let ph = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; ph += TAU * (900 * Math.exp(-t * 30) + 60) / sr; b[i] = Math.sign(Math.sin(ph)) * Math.exp(-t / 0.08); } lp1(b, 4000); P(118, 'ZAP', norm(b, 0.55), {bus: 1, vol: 0.45}); }
+  { const c = crash().reverse(); fadeOut(c, 0.005); P(117, 'REV CYMBAL', c, {bus: 2, vol: 0.5}); }
+  { const b = F(0.6); const seg = Math.floor(sr * 0.025); for (let s = 0; s * seg < b.length; s++) { const kind = Math.floor(Math.random() * 4), f = 200 + Math.random() * 3000; let ph = 0;
+      for (let i = 0; i < seg && s * seg + i < b.length; i++) { ph += TAU * f / sr; b[s * seg + i] = kind === 0 ? Math.sin(ph) : kind === 1 ? rnd() * 0.6 : kind === 2 ? Math.sign(Math.sin(ph)) * 0.5 : 0; } }
+    P(119, 'GLITCH', norm(b, 0.55), {bus: 1, vol: 0.45}); }
+  { const b = F(0.8); let hold = 0; for (let i = 0; i < b.length; i++) { if (i % 400 === 0) hold = 0.4 + 0.6 * Math.random(); b[i] = rnd() * hold + (Math.random() < 0.002 ? rnd() : 0); } bp(b, 1800, 0.7); P(120, 'RADIO STATIC', fadeOut(norm(b, 0.5), 0.05), {vol: 0.4}); }
+  P(121, 'WHOOSH', noiseSweep(1.4, 400, 6000, u => Math.pow(Math.sin(Math.PI * u), 2)), {bus: 2, vol: 0.5});
+  P(122, 'BELL C', fmBell(72, 2.4, 1.4, 2), {bus: 1, vol: 0.45}); P(123, 'BELL G', fmBell(79, 2.4, 1.4, 2), {bus: 1, vol: 0.4});
+  { const parts = [84, 88, 91, 96].map((m, k) => { const b = fmBell(m, 3, 3.5, 1.2); const o = new Float32Array(Math.floor(sr * 3.4)); const off = Math.floor(k * 0.09 * sr); for (let i = 0; i < b.length && i + off < o.length; i++) o[i + off] = b[i]; return [o, 0.5]; });
+    P(124, 'CHIME', norm(mix(...parts), 0.6), {bus: 2, vol: 0.4}); }
+  { const [L, R] = padSyn([36, 48, 55, 60, 63], 6); for (const b of [L, R]) for (let i = 0; i < b.length; i++) b[i] *= Math.sqrt(Math.sin(Math.PI * i / b.length)); P(125, 'DRONE Cm', L, {bus: 2, vol: 0.4}, R); }
+  P(126, 'SIREN', fadeOut(norm(tone(1.6, t => 700 + 300 * Math.sin(TAU * 1.5 * t), t => Math.min(1, t * 50)), 0.5), 0.1), {bus: 1, vol: 0.4});
+  { const b = F(0.9); [1, 1.006, 0.994].forEach(d => { let p = 0; for (let i = 0; i < b.length; i++) { const t = i / sr; p += mtof(58) * d * (1 - 0.06 * Math.exp(-t * 40)) * (1 + 0.004 * Math.sin(TAU * 6 * t)) / sr; b[i] += (2 * (p % 1) - 1) * 0.3; } });
+    lp1(lp1(b, 2000), 2600); for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] *= Math.min(1, t * 50) * (t > 0.75 ? Math.max(0, 1 - (t - 0.75) / 0.15) : 1); } P(127, 'HORN BLAST', norm(sat(b, 2), 0.75), {bus: 2, vol: 0.5}); }
+
+  /* ── Bank I · DnB / JUNGLE / DEMBOW (128–143) */
+  P(129, 'KICK DNB', kick(170, 52, 0.22, 1.2)); P(130, 'SNARE DNB', norm(sat(hp1(snare(), 200), 1.5)), {vol: 0.75});
+  P(131, 'HAT DNB', hat(0.03), {vol: 0.4, pan: 0.25}); P(132, 'RIDE DNB', S.pads[69].L.slice(), {vol: 0.35, pan: -0.25});
+  P(133, 'GHOST SNARE', S.pads[130].L.slice(), {vol: 0.3});
+  [['F', 29], ['G#', 32], ['A#', 34], ['C', 36]].forEach(([n, m], k) => { const [L, R] = reese(m + 12); P(134 + k, 'REESE ' + n, L, {group: 4, bus: 1, vol: 0.52}, R); });
+  P(138, 'DEMBOW KICK', kick(140, 50, 0.3, 0.8)); P(139, 'DEMBOW SNARE', norm(hp1(layer(snare(), snap(), 0.8), 400)), {vol: 0.6});
+  { const b = tom(450); bp(b, 900, 2); P(140, 'TIMBALE HI', norm(layer(b, tom(450), 0.6), 0.75), {vol: 0.5, pan: 0.3}); }
+  P(141, 'TIMBALE LO', tom(300), {vol: 0.55, pan: -0.3});
+  { const b = F(0.25); for (let i = 0; i < b.length; i++) { const t = i / sr; b[i] = rnd() * (0.4 + 0.6 * ((t * 70) % 1 < 0.35 ? 1 : 0)) * Math.min(1, t * 40) * Math.exp(-t / 0.15); } bp(b, 4500, 1.2); P(142, 'GUIRO', norm(b, 0.6), {vol: 0.4, pan: 0.4}); }
+  { const [L, R] = saws([60, 64, 67, 72], 0.7, 5000, 0.08, 5, 0.25); const n = noiseSweep(0.7, 5000, 800, u => Math.exp(-u * 10)); for (let i = 0; i < L.length; i++) { L[i] += n[i] * 0.4; R[i] += n[i] * 0.4; } P(143, 'STAB HIT', L, {bus: 2, vol: 0.55}, R); }
+  { const [L, R] = renderLoop(170, 32, [
+      ...hitsOf(129, 'x.x. .... ..xx .... x.x. .... ..x. ....'),
+      ...hitsOf(130, '.... x..x .x.. x..x .... x..x .x.. ..x.', 0.9),
+      ...hitsOf(133, '.... .... .... .o.. .... .... ...o .o..', 0.5),
+      ...hitsOf(132, 'x.x. x.x. x.x. x.x. x.x. x.x. x.x. x.x.', 0.5)]);
+    P(128, 'BREAK LOOP 170', L, {loop: 1, sync: 170, vol: 0.75}, R); }
+
+  /* ───────── expansion patterns ───────── */
+  const FXA = {1: [8, [0.35, 0.3, 0.35]], 2: [4, [0.55, 0.45, 0.3]]};
+  S.pats[0].meta = {name: 'NEO SOUL A', bpm: 90, swing: 0.16, bank: 0, fx: FXA};
+  S.pats[1].meta = {name: 'NEO SOUL B', bpm: 90, swing: 0.16, bank: 1, fx: FXA};
+  S.pats[2].meta = {name: 'LOOP JAM', bpm: 90, swing: 0.16, bank: 2, fx: FXA};
+  const M = (i, name, bpmP, swingP, bank, len, fx) => { S.pats[i].len = len; S.pats[i].meta = {name, bpm: bpmP, swing: swingP, bank, fx}; };
+
+  M(3, 'TRAP', 140, 0, 3, 32, {1: [3, [0.66, 0.35, 0.3]], 2: [4, [0.6, 0.4, 0.3]]});
+  G(3, 48, 'x... .... .... .... x... ..x. .... ....');
+  G(3, 49, 'x... .... .... .... x... .... .... ....'); G(3, 52, '.... .... ...x .... .... .... .... ....');
+  G(3, 51, '.... .... .... .... .... ..x. .... ....'); G(3, 50, '.... .... .... .... .... .... ...x ....');
+  G(3, 54, '.... .... x... .... .... .... x... ....'); G(3, 55, '.... .... x... .... .... .... x... ....');
+  G(3, 56, 'x.x. x.x. x.x. xxx. x.x. x.x. x.xx x.o.'); G(3, 57, '.... .... .... .... .... .... .... ..x.');
+  G(3, 58, '.... ...o .... .... .... ...o .... ....'); G(3, 62, 'x..x ..x. ..x. .... x..x ..x. x... ....'); G(3, 63, 'x... .... .... .... .... .... .... ....');
+
+  M(4, 'TRAP BOUNCE', 150, 0, 3, 32, {1: [3, [0.66, 0.35, 0.3]], 2: [4, [0.6, 0.4, 0.3]]});
+  G(4, 48, 'x... .... ..x. .... x... .... .... ....');
+  G(4, 49, 'x... .... .... .... x... .... .... ....'); G(4, 53, '.... .... ..x. .... .... .... .... ....'); G(4, 50, '.... .... .... .... .... .... x... ....');
+  G(4, 55, '.... .... x... .... .... .... x... ....'); G(4, 56, 'xxo. xxo. xxo. xo.x xxo. xxo. xo.x xxxx');
+  G(4, 60, '..x. .... ..x. x... ..x. .... ..x. ....'); G(4, 61, '.... x... .... ..x. .... x... .... ....');
+  G(4, 59, 'x... ...o .... .... x... ...o .... ....'); G(4, 62, 'x... .... x... .... x..x .... x... ....');
+
+  M(5, 'HOUSE', 124, 0.1, 4, 32, {1: [3, [0.66, 0.3, 0.25]], 2: [4, [0.45, 0.5, 0.2]]});
+  G(5, 64, 'x... x... x... x... x... x... x... x...'); G(5, 66, '.... x... .... x... .... x... .... x...');
+  G(5, 68, '..x. ..x. ..x. ..x. ..x. ..x. ..x. ..x.'); G(5, 70, 'oxoo oxoo oxoo oxoo oxoo oxoo oxoo oxox');
+  G(5, 72, 'x... ...x .... .... .... .... .... ....'); G(5, 73, '.... .... .... ..x. .... .... .... ....');
+  G(5, 74, '.... .... .... .... x... ...x .... ....'); G(5, 75, '.... .... .... .... .... .... .... ..x.');
+  G(5, 76, '..x. ..x. ..x. ..xx .... .... .... ....'); G(5, 77, '.... .... .... .... ..x. ..x. ..x. ..xx');
+
+  M(6, 'TECHNO', 130, 0, 4, 32, {1: [1, [0.33, 0.65, 0.35]], 2: [4, [0.7, 0.7, 0.25]]});
+  G(6, 65, 'x... x... x... x... x... x... x... x...'); G(6, 69, '..x. ..x. ..x. ..x. ..x. ..x. ..x. ..x.');
+  G(6, 67, 'oxoo oxoo oxoo oxoo oxoo oxoo oxoo oxoo'); G(6, 66, '.... x... .... x... .... x... .... x...');
+  G(6, 71, '...x .... ..x. .... ...x .... .... .x..'); G(6, 78, 'x.xx .x.x x..x .xx. x.xx .x.x x.x. xx.x');
+
+  M(7, 'LO-FI', 78, 0.3, 5, 32, {1: [8, [0.4, 0.4, 0.45]], 2: [4, [0.6, 0.6, 0.35]]});
+  G(7, 80, 'x... ...x ..x. .... x... .... ..x. ....'); G(7, 81, '.... x... .... x... .... x... .... x...');
+  G(7, 82, 'x.x. x.xo x.x. x.xo x.x. x.xo x.x. x.xo'); G(7, 83, '.... .... .... .o.. .... .... ...o ....');
+  G(7, 86, 'x... .... .... .... .... .... .... ....'); G(7, 87, '.... .... x... .... .... .... .... ....');
+  G(7, 88, '.... .... .... .... x... .... .... ....'); G(7, 89, '.... .... .... .... .... .... x... ....');
+  G(7, 90, 'x... ..x. .... .... .... .... .... ....'); G(7, 91, '.... .... x... ..x. .... .... .... ....');
+  G(7, 92, '.... .... .... .... x... ..x. .... ....'); G(7, 93, '.... .... .... .... .... .... x... ..x.');
+
+  M(8, 'BOOM BAP', 92, 0.22, 5, 32, {1: [8, [0.35, 0.3, 0.35]], 2: [4, [0.5, 0.5, 0.25]]});
+  G(8, 80, 'x... .... ..x. .x.. x... .... ..xx ....'); G(8, 81, '.... x... .... x... .... x... .... x...');
+  G(8, 82, 'x.x. x.x. x.x. x.x. x.x. x.x. x.x. x.xo'); G(8, 85, '.... .... .... ...o .... .... .... ...o');
+  G(8, 20, 'x... .... .... .... .... .... .... ....'); G(8, 21, '.... .... .... .... x... .... .... ....');
+  G(8, 28, 'x... .... ..x. .... .... .... .... ....'); G(8, 29, '.... .... .... .... x... .... ..x. ....');
+
+  M(9, 'SYNTHWAVE', 100, 0, 6, 64, {1: [3, [0.66, 0.45, 0.35]], 2: [4, [0.75, 0.35, 0.4]]});
+  const bar4 = s => s.repeat(4);
+  G(9, 0, bar4('x... x... x... x...')); G(9, 2, bar4('.... x... .... x...')); G(9, 3, bar4('.... x... .... x...'));
+  G(9, 4, bar4('o.o. o.o. o.o. o.o.'));
+  G(9, 96, 'x' + '.'.repeat(63)); G(9, 97, '.'.repeat(16) + 'x' + '.'.repeat(47)); G(9, 98, '.'.repeat(32) + 'x' + '.'.repeat(31)); G(9, 99, '.'.repeat(48) + 'x' + '.'.repeat(15));
+  G(9, 27, 'x.x.x.x.x.x.x.x.'); G(9, 29, '.'.repeat(16) + 'x.x.x.x.x.x.x.x.'); G(9, 25, '.'.repeat(32) + 'x.x.x.x.x.x.x.x.'); G(9, 28, '.'.repeat(48) + 'x.x.x.x.x.x.x.x.');
+  [[0, 107], [3, 108], [6, 109], [10, 108], [12, 107], [16, 109], [19, 110], [22, 109], [26, 108], [28, 107], [32, 106], [35, 107], [38, 108], [42, 107], [44, 105], [48, 104], [51, 105], [54, 106], [58, 107], [60, 108]]
+    .forEach(([s, p]) => { S.pats[9].d[s * NP + p] = 105; });
+
+  M(10, 'DRUM & BASS', 172, 0, 8, 32, {1: [1, [0.4, 0.35, 0.35]], 2: [4, [0.5, 0.5, 0.25]]});
+  G(10, 129, 'x... .... ..x. .... x... .... ..xx ....'); G(10, 130, '.... x... .... x... .... x... .... x...');
+  G(10, 131, 'o.x. o.x. o.x. o.xo o.x. o.x. o.x. o.xx'); G(10, 133, '.... ...o .o.. ...o .... ...o .o.. ....');
+  G(10, 134, 'x... .... .... .... .... .... .... ....'); G(10, 135, '.... .... .... .... x... .... .... ....');
+  G(10, 136, '.... .... .... .... .... .... x... ....'); G(10, 137, '.... .... .... .... .... .... .... ..x.');
+
+  M(11, 'JUNGLE', 170, 0, 8, 32, {1: [1, [0.42, 0.3, 0.3]], 2: [3, [0.66, 0.4, 0.3]]});
+  G(11, 128, 'x... .... .... .... .... .... .... ....'); G(11, 137, 'x... .... .... .... .... .... .... ....');
+  G(11, 136, '.... .... .... x... .... .... .... ....'); G(11, 135, '.... .... .... .... x... .... .... ....');
+  G(11, 134, '.... .... .... .... .... .... x... ....'); G(11, 143, 'x... .... .... ..x. .... .... .... ....');
+  G(11, 132, '..x. ..x. ..x. ..x. ..x. ..x. ..x. ..x.');
+
+  M(12, 'DEMBOW', 96, 0, 8, 16, {1: [3, [0.5, 0.3, 0.2]], 2: [4, [0.45, 0.5, 0.2]]});
+  G(12, 138, 'x... x... x... x...'); G(12, 139, '...x ..x. ...x ..x.');
+  G(12, 140, '.... ...x .... .x.x'); G(12, 141, '..x. .... ..x. ....'); G(12, 142, 'x... x... x... x...');
+  G(12, 131, 'o.o. o.o. o.o. o.o.'); G(12, 49, 'x... .... x... ....');
+
+  M(13, 'AFRO', 108, 0.12, 3, 32, {1: [6, [0.3, 0.5, 0.5]], 2: [4, [0.55, 0.5, 0.3]]});
+  G(13, 64, 'x... ...x ..x. .... x... ...x ..x. ....'); G(13, 58, '.... x... .... x..o .... x... .... x...');
+  G(13, 60, '..x. .x.. ..x. ..x. ..x. .x.. ..x. .xx.'); G(13, 61, 'x... ...x .... x... x... ...x .... ....');
+  G(13, 59, 'x.x. x..x .x.x ..x. x.x. x..x .x.x ..x.'); G(13, 70, 'oxox oxox oxox oxox oxox oxox oxox oxox');
+  G(13, 95, 'x... .... .... .... x... .... .... ....'); G(13, 52, 'x... .... ..x. .... x... .... ..x. ..x.');
+
+  M(14, 'AMBIENT', 80, 0, 7, 64, {1: [3, [0.66, 0.55, 0.4]], 2: [4, [0.88, 0.3, 0.5]]});
+  G(14, 114, 'x' + '.'.repeat(63)); G(14, 125, 'x' + '.'.repeat(31) + 'x' + '.'.repeat(31));
+  [0, 10, 24, 40].forEach(s => { S.pats[14].d[s * NP + 122] = 100; }); [6, 20, 34, 52].forEach(s => { S.pats[14].d[s * NP + 123] = 90; });
+  [16, 48].forEach(s => { S.pats[14].d[s * NP + 124] = 100; }); S.pats[14].d[51 * NP + 117] = 100; S.pats[14].d[30 * NP + 115] = 90;
+}
+
+/* ═════════════ engine sync ═════════════ */
+const PID = {start:0, end:1, pitch:2, vol:3, pan:4, loop:5, gate:6, rev:7, group:8, bus:9, atk:10, rel:11, sync:12};
+function sendPad(i){
+  const p = S.pads[i];
+  if (!p.L) { send({t: 'clear', pad: i}); return; }
+  const L = p.L.slice(), R = p.R ? p.R.slice() : null;
+  sendT({t: 'load', pad: i, L, R}, R ? [L.buffer, R.buffer] : [L.buffer]);
+  for (const k in PID) send({t: 'p', pad: i, id: PID[k], v: p[k]});
+}
+function sendParam(i, k){ send({t: 'p', pad: i, id: PID[k], v: S.pads[i][k]}); }
+function syncAll(){
+  for (let i = 0; i < NP; i++) if (S.pads[i].L) sendPad(i);
+  S.pats.forEach((pt, pi) => { send({t: 'patlen', pat: pi, v: pt.len});
+    for (let s = 0; s < NSTEP; s++) for (let p = 0; p < NP; p++) { const v = pt.d[s * NP + p]; if (v) send({t: 'step', pat: pi, s, pad: p, v}); } });
+  send({t: 'bpm', v: S.bpm}); send({t: 'swing', v: S.swing}); send({t: 'master', v: S.master});
+  for (const b of [1, 2]) { send({t: 'fx', bus: b, v: S.fx[b].t}); S.fx[b].c.forEach((v, i) => send({t: 'fxp', bus: b, i, v})); }
+  send({t: 'sel', pad: S.sel});
+}
+
+/* ═════════════ helpers ═════════════ */
+const $ = id => document.getElementById(id);
+const padId = i => BANKS[Math.floor(i / 16)] + '-' + String(i % 16 + 1).padStart(2, '0');
+let toastT = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1800); }
+function el(tag, cls, html){ const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+
+/* ═════════════ knob ═════════════ */
+function Knob(label, o){
+  const k = el('div', 'knob' + (o.big ? ' big' : ''));
+  k.tabIndex = 0; k.setAttribute('role', 'slider'); k.setAttribute('aria-label', label);
+  const d = el('div', 'kd'), ring = el('div', 'kring'), l = el('div', 'kl', label), v = el('div', 'kv');
+  d.appendChild(ring); k.append(d, l, v);
+  let val = o.val;
+  const range = o.max - o.min;
+  const render = () => { const f = (val - o.min) / range; d.style.transform = `rotate(${-135 + f * 270}deg)`;
+    ring.style.background = `conic-gradient(from -135deg, var(--amber) ${f * 270}deg, rgba(255,255,255,.06) ${f * 270}deg 270deg, transparent 270deg)`;
+    ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 25px, #000 26px, #000 28px, transparent 29px)';
+    if (o.big) ring.style.webkitMask = ring.style.mask = 'radial-gradient(circle, transparent 30px, #000 31px, #000 33px, transparent 34px)';
+    v.textContent = o.fmt ? o.fmt(val) : val.toFixed(2); k.setAttribute('aria-valuetext', v.textContent); };
+  const set = (nv, fire = true) => { nv = Math.max(o.min, Math.min(o.max, nv)); if (o.step) nv = Math.round(nv / o.step) * o.step; if (nv === val) return; val = nv; render(); if (fire && o.onChange) o.onChange(val); };
+  let sy = 0, sv = 0, drag = false;
+  k.addEventListener('pointerdown', e => { drag = true; sy = e.clientY; sv = val; k.setPointerCapture(e.pointerId); e.preventDefault(); k.focus({preventScroll: true}); });
+  k.addEventListener('pointermove', e => { if (!drag) return; const sc = e.shiftKey ? 600 : 160; set(sv + (sy - e.clientY) / sc * range); });
+  k.addEventListener('pointerup', () => drag = false); k.addEventListener('pointercancel', () => drag = false);
+  k.addEventListener('dblclick', () => set(o.def != null ? o.def : o.val));
+  k.addEventListener('wheel', e => { e.preventDefault(); set(val - Math.sign(e.deltaY) * (o.step || range / 100)); }, {passive: false});
+  k.addEventListener('keydown', e => { const st = o.step || range / 50; if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { set(val + st); e.preventDefault(); } if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { set(val - st); e.preventDefault(); } });
+  render();
+  return {el: k, set, get: () => val, setFmt(f){ o.fmt = f; render(); }};
+}
+
+/* ═════════════ build UI ═════════════ */
+const padEls = [];
+function buildPads(){
+  const box = $('pads');
+  for (let i = 0; i < 16; i++) {
+    const b = el('button', 'pad'); b.innerHTML = '<span class="pn"></span><span class="led"></span><span class="pnm"></span>';
+    b.dataset.slot = i;
+    const on = e => { e.preventDefault(); padDown(S.bank * 16 + i, 1); b.classList.add('hit'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
+    const off = () => { if (!b.classList.contains('hit')) return; b.classList.remove('hit'); padUp(S.bank * 16 + i); };
+    b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); e.stopPropagation(); padDown(S.bank * 16 + i, 1); b.classList.add('hit'); } });
+    b.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); off(); } });
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.addEventListener('dragover', e => { e.preventDefault(); b.classList.add('drop'); });
+    b.addEventListener('dragleave', () => b.classList.remove('drop'));
+    b.addEventListener('drop', e => { e.preventDefault(); b.classList.remove('drop'); ensureAudio(); loadFiles([...e.dataTransfer.files], S.bank * 16 + i); });
+    box.appendChild(b); padEls.push(b);
+  }
+  const bk = $('banks');
+  for (let b = 0; b < NB; b++) { const x = el('button', 'btn led', BANKS[b]); x.addEventListener('click', () => { S.bank = b; renderPads(); drawSeq(); }); bk.appendChild(x); }
+}
+function renderPads(){
+  [...$('banks').children].forEach((x, b) => { x.classList.toggle('on', b === S.bank); x.classList.toggle('has', S.pads.slice(b * 16, b * 16 + 16).some(p => p.L)); });
+  padEls.forEach((b, i) => { const idx = S.bank * 16 + i, p = S.pads[idx];
+    b.querySelector('.pn').textContent = i + 1; b.querySelector('.pnm').textContent = p.L ? p.name : 'empty';
+    b.classList.toggle('empty', !p.L); b.classList.toggle('sel', idx === S.sel); b.dataset.bus = p.bus;
+    b.classList.toggle('play', S.active.has(idx)); b.classList.toggle('target', S.recArm && S.recTarget === idx);
+    b.setAttribute('aria-label', `Pad ${i + 1}, ${p.L ? p.name : 'empty'}`); });
+}
+
+function padDown(i, vel){
+  ensureAudio();
+  if (S.recArm && S.recTarget < 0) { startSampling(i); return; }
+  if (S.erase) { eraseFromPattern(i); return; }
+  if (S.sel !== i) { S.sel = i; send({t: 'sel', pad: i}); renderEdit(); }
+  send({t: 'on', pad: i, v: vel});
+  renderPads(); drawSeqLabels();
+}
+function padUp(i){ send({t: 'off', pad: i}); }
+
+/* FX */
+let fxKnobs = [];
+function buildFx(){
+  const list = $('fxList');
+  FX.forEach((f, t) => { const b = el('button', 'btn', f.n); b.addEventListener('click', () => setFxType(S.fxBus, t)); list.appendChild(b); });
+  $('bus1Btn').onclick = () => { S.fxBus = 1; renderFx(); };
+  $('bus2Btn').onclick = () => { S.fxBus = 2; renderFx(); };
+  renderFx();
+}
+function setFxType(bus, t){
+  const F_ = S.fx[bus]; if (F_.t === t) return;
+  F_.t = t; F_.c = FX[t].d ? FX[t].d.slice() : [0.5, 0.5, 0.5];
+  send({t: 'fx', bus, v: t}); F_.c.forEach((v, i) => send({t: 'fxp', bus, i, v}));
+  renderFx(); renderLcd();
+}
+function renderFx(){
+  $('bus1Btn').classList.toggle('on', S.fxBus === 1); $('bus2Btn').classList.toggle('on', S.fxBus === 2);
+  const F_ = S.fx[S.fxBus];
+  [...$('fxList').children].forEach((b, t) => b.classList.toggle('on', t === F_.t));
+  const host = $('fxKnobs'); host.innerHTML = '';
+  fxKnobs = [];
+  const def = FX[F_.t];
+  if (!def.c.length) { host.appendChild(el('p', 'hint', 'Bus ' + S.fxBus + ' passes through untouched. Pick an effect above, then route pads to this bus.')); return; }
+  def.c.forEach((name, i) => { const bus = S.fxBus, t = F_.t;
+    const k = Knob(name, {min: 0, max: 1, val: F_.c[i], def: def.d[i], fmt: v => fxFmt(t, i, v), big: true,
+      onChange: v => { S.fx[bus].c[i] = v; send({t: 'fxp', bus, i, v}); }});
+    fxKnobs.push(k); host.appendChild(k.el); });
+}
+
+/* PAD EDIT */
+let padKn = {};
+function buildEdit(){
+  const host = $('padKnobs');
+  const mk = (key, label, o) => { const k = Knob(label, Object.assign({onChange: v => { const p = S.pads[S.sel]; p[key] = v; sendParam(S.sel, key); if (key === 'pitch') drawWave(); }}, o)); padKn[key] = k; host.appendChild(k.el); };
+  mk('vol', 'Level', {min: 0, max: 1.2, val: 0.8, def: 0.8, fmt: v => Math.round(v * 100)});
+  mk('pan', 'Pan', {min: -1, max: 1, val: 0, def: 0, fmt: v => Math.abs(v) < 0.01 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 50)});
+  mk('pitch', 'Pitch', {min: -24, max: 24, val: 0, def: 0, step: 0.1, fmt: v => (v > 0 ? '+' : '') + v.toFixed(1)});
+  mk('atk', 'Attack', {min: 0, max: 2, val: 0, def: 0, fmt: v => v < 0.001 ? '0' : Math.round(v * 1000) + 'ms'});
+  mk('rel', 'Release', {min: 0.003, max: 3, val: 0.05, def: 0.05, fmt: v => Math.round(v * 1000) + 'ms'});
+  const modes = [['loop', 'Loop'], ['gate', 'Gate'], ['rev', 'Reverse']];
+  modes.forEach(([k, n]) => { const b = el('button', 'btn', n); b.dataset.k = k; b.onclick = () => { const p = S.pads[S.sel]; p[k] = p[k] ? 0 : 1; sendParam(S.sel, k); renderEdit(); }; $('modeSeg').appendChild(b); });
+  const nb = el('button', 'btn', 'Normalize'); nb.onclick = () => { normalizePad(S.sel); }; $('modeSeg').appendChild(nb);
+  ['Dry', 'Bus 1', 'Bus 2'].forEach((n, v) => { const b = el('button', 'btn', n); b.onclick = () => { S.pads[S.sel].bus = v; sendParam(S.sel, 'bus'); renderEdit(); renderPads(); renderLcd(); }; $('busSeg').appendChild(b); });
+  ['Off', '1', '2', '3', '4'].forEach((n, v) => { const b = el('button', 'btn', n); b.onclick = () => { S.pads[S.sel].group = v; sendParam(S.sel, 'group'); renderEdit(); }; $('grpSeg').appendChild(b); });
+  const syncK = Knob('Orig BPM', {min: 40, max: 240, val: 90, def: 90, step: 0.5, fmt: v => v.toFixed(1), onChange: v => { const p = S.pads[S.sel]; if (p.sync) { p.sync = v; sendParam(S.sel, 'sync'); } p._syncVal = v; }});
+  padKn.sync = syncK; $('syncKnobHost').appendChild(syncK.el);
+  $('syncBtn').onclick = () => { const p = S.pads[S.sel]; p.sync = p.sync ? 0 : (p._syncVal || padKn.sync.get()); sendParam(S.sel, 'sync'); renderEdit(); };
+  $('clearPadBtn').onclick = () => { const b = $('clearPadBtn'); if (!b.dataset.arm) { b.dataset.arm = 1; b.textContent = 'Sure?'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Clear'; }, 2000); return; }
+    delete b.dataset.arm; b.textContent = 'Clear'; S.pads[S.sel] = emptyPad(); sendPad(S.sel); renderAll(); toast(padId(S.sel) + ' CLEARED'); };
+  $('chopBtn').onclick = () => { $('chopRow').hidden = !$('chopRow').hidden; $('chopBtn').classList.toggle('on', !$('chopRow').hidden); };
+  $('chopMode').onclick = () => { S.chopMode = S.chopMode === 'transient' ? 'equal' : 'transient'; $('chopMode').textContent = S.chopMode === 'transient' ? 'Transient' : 'Equal'; };
+  document.querySelectorAll('[data-chop]').forEach(b => b.onclick = () => chop(+b.dataset.chop));
+  $('exportBtn').onclick = exportWav;
+}
+function renderEdit(){
+  const p = S.pads[S.sel];
+  $('editTitle').textContent = 'Pad ' + padId(S.sel) + (p.L ? ' · ' + (p.L.length / SR).toFixed(2) + 's' : ' · empty');
+  for (const k of ['vol', 'pan', 'pitch', 'atk', 'rel']) padKn[k].set(p[k], false);
+  padKn.sync.set(p.sync || p._syncVal || 90, false);
+  [...$('modeSeg').children].forEach(b => { if (b.dataset.k) b.classList.toggle('on', !!p[b.dataset.k]); });
+  [...$('busSeg').children].forEach((b, v) => b.classList.toggle('on', p.bus === v));
+  [...$('grpSeg').children].forEach((b, v) => b.classList.toggle('on', p.group === v));
+  $('syncBtn').classList.toggle('on', !!p.sync);
+  renderLcd(); drawWave();
+}
+
+/* TRANSPORT */
+let bpmDisp, swingK, masterK;
+function buildCtl(){
+  $('playBtn').onclick = () => { ensureAudio(); setPlay(!S.playing); };
+  $('precBtn').onclick = () => { ensureAudio(); S.prec = !S.prec; send({t: 'rec', v: S.prec ? 1 : 0}); if (S.prec && !S.playing) setPlay(true); renderCtl(); };
+  $('metroBtn').onclick = () => { ensureAudio(); S.metro = !S.metro; send({t: 'metro', v: S.metro ? 1 : 0}); renderCtl(); };
+  let taps = [];
+  $('tapBtn').onclick = () => { const t = performance.now(); taps = taps.filter(x => t - x < 2500); taps.push(t);
+    if (taps.length > 1) { const d = (taps[taps.length - 1] - taps[0]) / (taps.length - 1); setBpm(60000 / d); } };
+  const bv = $('bpmVal'); let sy = 0, sb = 0, dr = false;
+  bv.addEventListener('pointerdown', e => { dr = true; sy = e.clientY; sb = S.bpm; bv.setPointerCapture(e.pointerId); });
+  bv.addEventListener('pointermove', e => { if (dr) setBpm(sb + (sy - e.clientY) / (e.shiftKey ? 20 : 3)); });
+  bv.addEventListener('pointerup', () => dr = false);
+  bv.addEventListener('wheel', e => { e.preventDefault(); setBpm(S.bpm - Math.sign(e.deltaY) * (e.shiftKey ? 0.1 : 1)); }, {passive: false});
+  bv.addEventListener('keydown', e => { if (e.key === 'ArrowUp') { setBpm(S.bpm + 1); e.preventDefault(); } if (e.key === 'ArrowDown') { setBpm(S.bpm - 1); e.preventDefault(); } });
+  swingK = Knob('Swing', {min: 0, max: 0.5, val: S.swing, def: 0, fmt: v => Math.round((1 + v) / 2 * 100) + '%', onChange: v => { S.swing = v; send({t: 'swing', v}); }});
+  masterK = Knob('Master', {min: 0, max: 1.2, val: S.master, def: 0.85, fmt: v => Math.round(v * 100), onChange: v => { S.master = v; send({t: 'master', v}); }});
+  $('swingKnob').appendChild(swingK.el); $('masterKnob').appendChild(masterK.el);
+  [['1 bar', 16], ['2', 32], ['4', 64]].forEach(([n, v]) => { const b = el('button', 'btn', n); b.onclick = () => { S.pats[S.cur].len = v; send({t: 'patlen', pat: S.cur, v}); renderCtl(); drawSeq(); renderLcd(); }; $('lenSeg').appendChild(b); });
+  for (let i = 0; i < NPAT; i++) { const b = el('button', 'btn led', i + 1); b.onclick = () => selectPattern(i); $('patGrid').appendChild(b); }
+  $('rollBtn').onclick = () => { S.roll = !S.roll; send({t: 'roll', on: S.roll ? 1 : 0, div: S.rollDiv}); renderCtl(); };
+  [['1/32', 0.5], ['1/16T', 2 / 3], ['1/16', 1], ['1/8T', 4 / 3], ['1/8', 2]].forEach(([n, v]) => { const b = el('button', 'btn', n); b.dataset.v = v; b.onclick = () => { S.rollDiv = v; send({t: 'roll', on: S.roll ? 1 : 0, div: v}); renderCtl(); }; $('rollSeg').appendChild(b); });
+  $('srcRes').onclick = () => { S.recSrc = 'resample'; renderCtl(); };
+  $('srcMic').onclick = () => { S.recSrc = 'mic'; renderCtl(); };
+  $('recBtn').onclick = () => { ensureAudio(); onRecBtn(); };
+  $('loadBtn').onclick = () => { ensureAudio(); $('fileIn').click(); };
+  $('fileIn').onchange = e => { loadFiles([...e.target.files], S.sel); e.target.value = ''; };
+  $('clrPatBtn').onclick = () => { const b = $('clrPatBtn'); if (!b.dataset.arm) { b.dataset.arm = 1; b.textContent = 'Sure?'; setTimeout(() => { delete b.dataset.arm; b.textContent = 'Clear pattern'; }, 2000); return; }
+    delete b.dataset.arm; b.textContent = 'Clear pattern'; S.pats[S.cur].d.fill(0); send({t: 'clrpat', pat: S.cur}); drawSeq(); markPatterns(); toast('PATTERN ' + (S.cur + 1) + ' CLEARED'); };
+  $('erasePadBtn').onclick = () => { eraseFromPattern(S.sel); };
+}
+function setPlay(on){ S.playing = on; send({t: 'play', v: on ? 1 : 0}); if (!on) { S.step = -1; if (S.prec) { S.prec = false; send({t: 'rec', v: 0}); } } renderCtl(); drawSeqPh(); renderLcd(); }
+function setBpm(b){ S.bpm = Math.round(Math.max(40, Math.min(240, b)) * 10) / 10; send({t: 'bpm', v: S.bpm}); $('bpmVal').textContent = S.bpm.toFixed(1); renderLcd(); }
+function selectPattern(i){
+  ensureAudio();
+  send({t: 'pat', v: i});
+  if (S.playing && i !== S.cur) S.queued = i; else { S.cur = i; S.queued = -1; applyPatMeta(i); }
+  renderCtl(); drawSeq(); renderLcd();
+  const m = S.pats[i].meta; toast('PTN ' + String(i + 1).padStart(2, '0') + ' ' + (m ? m.name + ' · ' + m.bpm + ' BPM' : 'EMPTY'));
+}
+function applyFx(bus, t, c){ S.fx[bus] = {t, c: c.slice()}; send({t: 'fx', bus, v: t}); c.forEach((v, i) => send({t: 'fxp', bus, i, v})); }
+function applyPatMeta(i){
+  const m = S.pats[i].meta; if (!m) return;
+  setBpm(m.bpm); S.swing = m.swing; send({t: 'swing', v: m.swing}); if (swingK) swingK.set(m.swing, false);
+  for (const b of [1, 2]) if (m.fx[b]) applyFx(b, m.fx[b][0], m.fx[b][1]);
+  S.bank = m.bank; renderFx(); renderPads();
+}
+function markPatterns(){ [...$('patGrid').children].forEach((b, i) => b.classList.toggle('has', S.pats[i].d.some(v => v))); }
+function renderCtl(){
+  $('playBtn').classList.toggle('on', S.playing); $('playBtn').textContent = S.playing ? 'Stop' : 'Play';
+  $('precBtn').classList.toggle('on', S.prec); $('metroBtn').classList.toggle('on', S.metro);
+  $('rollBtn').classList.toggle('on', S.roll);
+  [...$('rollSeg').children].forEach(b => b.classList.toggle('on', +b.dataset.v === S.rollDiv));
+  [...$('lenSeg').children].forEach((b, k) => b.classList.toggle('on', S.pats[S.cur].len === [16, 32, 64][k]));
+  [...$('patGrid').children].forEach((b, i) => { b.classList.toggle('on', i === S.cur); b.classList.toggle('queued', i === S.queued); const m = S.pats[i].meta; b.title = m ? m.name + ' · ' + m.bpm + ' BPM' : 'Empty pattern'; });
+  { const m = S.pats[S.cur].meta, q = S.queued >= 0 ? S.pats[S.queued].meta : null;
+    $('patName').textContent = (m ? m.name + ' · ' + m.bpm + ' BPM' : 'Empty pattern · record your own') + (S.queued >= 0 ? '  →  next: ' + (q ? q.name : 'empty') : ''); }
+  $('srcRes').classList.toggle('on', S.recSrc === 'resample'); $('srcMic').classList.toggle('on', S.recSrc === 'mic');
+  const rb = $('recBtn'); rb.classList.toggle('on', S.recTarget >= 0); rb.classList.toggle('blink', S.recArm && S.recTarget < 0);
+  rb.textContent = S.recTarget >= 0 ? 'Stop rec' : (S.recArm ? 'Pick a pad' : 'Rec');
+  $('bpmVal').textContent = S.bpm.toFixed(1);
+  markPatterns();
+}
+
+/* ═════════════ LCD & waveform ═════════════ */
+function renderLcd(){
+  const p = S.pads[S.sel];
+  $('l1').textContent = padId(S.sel) + ' ' + (p.L ? p.name : '- EMPTY -');
+  const tags = []; if (p.loop) tags.push('LOOP'); if (p.gate) tags.push('GATE'); if (p.rev) tags.push('REV'); if (p.sync) tags.push('SYNC');
+  tags.push(p.bus ? 'BUS' + p.bus + ':' + FX[S.fx[p.bus].t].n.toUpperCase() : 'DRY');
+  $('l1r').textContent = tags.join(' ');
+  if (!lcdMsg) lcdLine2();
+}
+let lcdMsg = '', lcdMsgT = 0;
+function lcdFlash(m, ms = 1500){ lcdMsg = m; $('l2').textContent = m; clearTimeout(lcdMsgT); if (ms) lcdMsgT = setTimeout(() => { lcdMsg = ''; lcdLine2(); }, ms); }
+function lcdLine2(){
+  const len = S.pats[S.cur].len;
+  $('l2').textContent = `BPM ${S.bpm.toFixed(1).padStart(5, '0')}  PTN ${String(S.cur + 1).padStart(2, '0')}${S.queued >= 0 ? '>' + String(S.queued + 1).padStart(2, '0') : ''}  ${S.step >= 0 ? String(S.step + 1).padStart(2, '0') : '--'}/${len}${S.prec ? '  ●REC' : ''}`;
+}
+const wave = $('wave');
+function drawWave(){
+  const c = wave, dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (!w) return;
+  if (c.width !== Math.round(w * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement);
+  const ink = css.getPropertyValue('--lcd-ink').trim(), dim = css.getPropertyValue('--lcd-dim').trim();
+  const p = S.pads[S.sel];
+  g.strokeStyle = dim; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke(); g.globalAlpha = 1;
+  if (!p.L) { g.fillStyle = dim; g.font = '20px VT323, monospace'; g.textAlign = 'center'; g.fillText('DROP A FILE, IMPORT, OR REC INTO THIS PAD', w / 2, h / 2 - 8); return; }
+  if (!p.peaks || p.peaks.w !== w) {
+    const n = p.L.length, mn = new Float32Array(w), mx = new Float32Array(w);
+    for (let x = 0; x < w; x++) { const a = Math.floor(x * n / w), b = Math.max(a + 1, Math.floor((x + 1) * n / w)); let lo = 0, hi = 0; const stp = Math.max(1, Math.floor((b - a) / 400));
+      for (let i = a; i < b; i += stp) { const v = p.R ? (p.L[i] + p.R[i]) * 0.5 : p.L[i]; if (v < lo) lo = v; if (v > hi) hi = v; } mn[x] = lo; mx[x] = hi; }
+    p.peaks = {w, mn, mx};
+  }
+  const xs = p.start / p.L.length * w, xe = p.end / p.L.length * w;
+  for (let x = 0; x < w; x++) { g.fillStyle = (x >= xs && x <= xe) ? ink : dim; const y1 = h / 2 - p.peaks.mx[x] * h * 0.46, y2 = h / 2 - p.peaks.mn[x] * h * 0.46; g.fillRect(x, y1, 1, Math.max(1, y2 - y1)); }
+  g.fillStyle = ink; g.fillRect(xs, 0, 2, h); g.fillRect(xe - 2, 0, 2, h);
+  g.font = '15px VT323, monospace'; g.textAlign = 'left'; g.fillText('S', xs + 4, 12); g.textAlign = 'right'; g.fillText('E', xe - 4, 12);
+  if (S.ph >= 0) { const x = S.ph / p.L.length * w; g.fillStyle = '#fff2d6'; g.fillRect(x, 0, 1, h); }
+}
+let waveDrag = null;
+wave.addEventListener('pointerdown', e => { const p = S.pads[S.sel]; if (!p.L) return; const r = wave.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width * p.L.length;
+  waveDrag = Math.abs(x - p.start) < Math.abs(x - p.end) ? 'start' : 'end'; wave.setPointerCapture(e.pointerId); moveMarker(e); });
+wave.addEventListener('pointermove', e => { if (waveDrag) moveMarker(e); });
+wave.addEventListener('pointerup', () => { waveDrag = null; });
+function moveMarker(e){ const p = S.pads[S.sel]; const r = wave.getBoundingClientRect(); let x = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * p.L.length);
+  if (waveDrag === 'start') p.start = Math.min(x, p.end - 64); else p.end = Math.max(x, p.start + 64);
+  p.start = Math.max(0, p.start); p.end = Math.min(p.L.length, p.end);
+  sendParam(S.sel, waveDrag); drawWave(); lcdFlash(`START ${(p.start / SR).toFixed(3)}s  END ${(p.end / SR).toFixed(3)}s`); }
+
+/* ═════════════ sequencer grid ═════════════ */
+let cells = [], heads = [], labels = [];
+function drawSeq(){
+  const g = $('sgrid'), pt = S.pats[S.cur], len = pt.len;
+  g.innerHTML = ''; cells = []; heads = []; labels = [];
+  g.style.gridTemplateColumns = `120px repeat(${len}, 22px)`;
+  g.appendChild(el('div'));
+  for (let s = 0; s < len; s++) { const h = el('div', 'shead', s % 4 === 0 ? (s / 4 + 1) : '·'); heads.push(h); g.appendChild(h); }
+  for (let r = 0; r < 16; r++) {
+    const pad = S.bank * 16 + r, p = S.pads[pad];
+    const lb = el('div', 'slabel', `<b>${r + 1}</b>${p.L ? p.name : '—'}`);
+    lb.onclick = () => { S.sel = pad; send({t: 'sel', pad}); renderEdit(); renderPads(); drawSeqLabels(); };
+    labels.push(lb); g.appendChild(lb);
+    const row = [];
+    for (let s = 0; s < len; s++) {
+      const c = el('button', 'cell' + (Math.floor(s / 4) % 2 ? ' beat' : '')); const v = pt.d[s * NP + pad];
+      c.setAttribute('aria-label', `Pad ${r + 1} step ${s + 1}`);
+      if (v) { c.classList.add('on'); if (v < 90) c.classList.add('soft'); }
+      c.onclick = e => { ensureAudio(); const cur = pt.d[s * NP + pad]; const nv = cur ? 0 : (e.shiftKey ? 64 : 110); pt.d[s * NP + pad] = nv; send({t: 'step', pat: S.cur, s, pad, v: nv});
+        c.classList.toggle('on', !!nv); c.classList.toggle('soft', nv && nv < 90); markPatterns(); };
+      row.push(c); g.appendChild(c);
+    }
+    cells.push(row);
+  }
+  [...$('banks').children].forEach((x, b) => { let u = false; for (let s2 = 0; s2 < len && !u; s2++) for (let q = b * 16; q < b * 16 + 16; q++) if (pt.d[s2 * NP + q]) { u = true; break; } x.classList.toggle('inpat', u); x.title = u ? 'Bank ' + BANKS[b] + ' has hits in this pattern' : 'Bank ' + BANKS[b]; });
+  const mt = S.pats[S.cur].meta;
+  $('seqTitle').textContent = `Pattern ${String(S.cur + 1).padStart(2, '0')}${mt ? ' ' + mt.name : ''} · Bank ${BANKS[S.bank]} · ${len} steps`;
+  drawSeqLabels(); drawSeqPh();
+}
+function drawSeqLabels(){ labels.forEach((l, r) => l.classList.toggle('sel', S.bank * 16 + r === S.sel)); }
+let lastPh = -1;
+function drawSeqPh(){
+  if (lastPh >= 0) { if (heads[lastPh]) heads[lastPh].classList.remove('cur'); cells.forEach(row => row[lastPh] && row[lastPh].classList.remove('ph')); }
+  lastPh = S.step;
+  if (S.step >= 0 && heads[S.step]) { heads[S.step].classList.add('cur'); cells.forEach(row => row[S.step] && row[S.step].classList.add('ph')); }
+}
+function eraseFromPattern(pad){ const pt = S.pats[S.cur]; for (let s = 0; s < NSTEP; s++) if (pt.d[s * NP + pad]) { pt.d[s * NP + pad] = 0; send({t: 'step', pat: S.cur, s, pad, v: 0}); } drawSeq(); markPatterns(); toast('ERASED ' + padId(pad) + ' FROM PTN ' + (S.cur + 1)); }
+
+/* ═════════════ engine status ═════════════ */
+function onStat(m){
+  const was = S.active; S.active = new Set(m.active);
+  let changed = was.size !== S.active.size; if (!changed) for (const a of was) if (!S.active.has(a)) { changed = true; break; }
+  if (changed) padEls.forEach((b, i) => b.classList.toggle('play', S.active.has(S.bank * 16 + i)));
+  if (m.pat !== S.cur && S.playing) { S.cur = m.pat; S.queued = -1; applyPatMeta(m.pat); renderCtl(); drawSeq(); renderLcd(); }
+  if (m.np < 0 && S.queued >= 0 && m.pat === S.queued) { S.queued = -1; renderCtl(); }
+  if (m.step !== S.step) { S.step = m.step; drawSeqPh(); if (!lcdMsg) lcdLine2(); }
+  const phChanged = m.ph !== S.ph; S.ph = m.ph; if (phChanged) drawWave();
+  $('mL').style.width = Math.min(100, m.pk[0] * 100) + '%'; $('mR').style.width = Math.min(100, m.pk[1] * 100) + '%';
+  if (m.recn >= 0) lcdFlash(`● REC ${S.recSrc === 'mic' ? 'MIC' : 'RESAMPLE'} → ${padId(S.recTarget)}  ${(m.recn / SR).toFixed(1)}s`, 0);
+}
+
+/* ═════════════ sampling ═════════════ */
+let micStream = null, micSrc = null;
+function onRecBtn(){
+  if (S.recTarget >= 0) { send({t: 'srecstop'}); return; }
+  S.recArm = !S.recArm; S.recTarget = -1;
+  if (S.recArm) lcdFlash('REC ARMED  SELECT A PAD', 0); else { lcdMsg = ''; lcdLine2(); }
+  renderCtl(); renderPads();
+}
+async function startSampling(pad){
+  S.recTarget = pad; renderCtl(); renderPads();
+  if (S.recSrc === 'mic') {
+    try {
+      if (!micStream) { micStream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}}); micSrc = ctx.createMediaStreamSource(micStream); }
+      if (node) micSrc.connect(node); else if (sp) micSrc.connect(sp);
+      send({t: 'srec', src: 'mic', max: 60});
+    } catch (e) {
+      S.recArm = false; S.recTarget = -1; renderCtl(); renderPads();
+      lcdFlash('MIC NOT AVAILABLE HERE', 2500); toast('Microphone is blocked here. Use Import or Resample.');
+    }
+  } else {
+    const pt = S.pats[S.cur]; const secs = pt.len * 60 / S.bpm / 4;
+    if (S.playing) send({t: 'srec', src: 'resample', max: 60});
+    else { send([{t: 'srec', src: 'resample', max: secs + 0.01}, {t: 'play', v: 1}]); S.playing = true; S._autoStop = true; renderCtl(); }
+  }
+}
+function onRecDone(L, R){
+  const pad = S.recTarget; S.recArm = false; S.recTarget = -1;
+  if (micSrc) try { micSrc.disconnect(); } catch (_) {}
+  if (S._autoStop) { S._autoStop = false; setPlay(false); }
+  lcdMsg = '';
+  if (pad < 0 || L.length < 64) { renderCtl(); renderPads(); lcdLine2(); return; }
+  if (S.recSrc === 'mic') { let i = 0; while (i < L.length && Math.abs(L[i]) < 0.01 && Math.abs(R[i]) < 0.01) i++; i = Math.max(0, i - Math.floor(SR * 0.005)); L = L.slice(i); R = R.slice(i); }
+  const mono = L.every((v, i) => v === R[i]);
+  const p = Object.assign(emptyPad(), {name: S.recSrc === 'mic' ? 'MIC ' + padId(pad) : 'RESAMPLE ' + String(S.cur + 1).padStart(2, '0'), L, R: mono ? null : R, end: L.length});
+  if (S.recSrc === 'resample') { p.sync = S.bpm; p._syncVal = S.bpm; }
+  S.pads[pad] = p; sendPad(pad); S.sel = pad; send({t: 'sel', pad});
+  renderAll(); toast('RECORDED ' + (L.length / SR).toFixed(2) + 's → ' + padId(pad));
+}
+
+/* ═════════════ files, chop, export ═════════════ */
+async function loadFiles(files, startPad){
+  files = files.filter(f => /^audio\//.test(f.type) || /\.(wav|mp3|aif|aiff|flac|ogg|m4a|aac)$/i.test(f.name));
+  if (!files.length) { toast('Drop audio files (WAV, MP3, AIFF, FLAC, OGG)'); return; }
+  const dc = ctx || new OfflineAudioContext(2, 1, 48000);
+  let pad = startPad;
+  for (const f of files) {
+    if (pad >= NP) break;
+    try {
+      const ab = await dc.decodeAudioData(await f.arrayBuffer());
+      const L = ab.getChannelData(0).slice(0, SR * 120), R = ab.numberOfChannels > 1 ? ab.getChannelData(1).slice(0, SR * 120) : null;
+      const name = f.name.replace(/\.[^.]+$/, '').toUpperCase().slice(0, 18);
+      S.pads[pad] = Object.assign(emptyPad(), {name, L, R, end: L.length});
+      sendPad(pad); pad++;
+    } catch (e) { toast('Could not decode ' + f.name); }
+  }
+  S.sel = startPad; send({t: 'sel', pad: startPad}); renderAll();
+  toast('LOADED ' + (pad - startPad) + ' FILE' + (pad - startPad === 1 ? '' : 'S'));
+}
+function normalizePad(i){ const p = S.pads[i]; if (!p.L) return; let m = 0; for (const a of [p.L, p.R]) if (a) for (const v of a) m = Math.max(m, Math.abs(v)); if (!m) return; const g = 0.95 / m;
+  for (const a of [p.L, p.R]) if (a) for (let k = 0; k < a.length; k++) a[k] *= g; p.peaks = null; sendPad(i); drawWave(); toast('NORMALIZED +' + (20 * Math.log10(g)).toFixed(1) + 'dB'); }
+function chop(n){
+  const src = S.pads[S.sel]; if (!src.L) { toast('Select a pad with a sample to chop'); return; }
+  const a = src.start, b = src.end, len = b - a;
+  let cuts = [];
+  if (S.chopMode === 'equal') { for (let k = 0; k < n; k++) cuts.push(a + Math.floor(k * len / n)); }
+  else {
+    const hop = 256, frames = Math.floor(len / hop), env = new Float32Array(frames);
+    for (let f = 0; f < frames; f++) { let s = 0; for (let i = 0; i < hop; i++) { const v = src.L[a + f * hop + i]; s += v * v; } env[f] = Math.sqrt(s / hop); }
+    const flux = []; for (let f = 1; f < frames; f++) { const d = env[f] - env[f - 1]; if (d > 0) flux.push([d, f]); }
+    flux.sort((x, y) => y[0] - x[0]); const minGap = Math.floor(0.06 * SR / hop); const picked = [0];
+    for (const [, f] of flux) { if (picked.length >= n) break; if (picked.every(q => Math.abs(q - f) > minGap)) picked.push(f); }
+    picked.sort((x, y) => x - y); cuts = picked.map(f => a + Math.max(0, f * hop - 64));
+    cuts[0] = a;
+  }
+  // destination: first fully empty bank, else the pads after the selected one
+  let dest = -1; for (let bk = 0; bk < NB; bk++) if (S.pads.slice(bk * 16, bk * 16 + 16).every(p => !p.L)) { dest = bk * 16; break; }
+  if (dest < 0) dest = Math.floor(S.sel / 16) * 16;
+  const srcCopy = {L: src.L, R: src.R, name: src.name, bus: src.bus};
+  cuts.forEach((c, k) => { const e = k + 1 < cuts.length ? cuts[k + 1] : b; const pad = dest + k; if (pad >= NP || (dest % 16) + k >= 16) return;
+    const L = srcCopy.L.slice(c, e), R = srcCopy.R ? srcCopy.R.slice(c, e) : null;
+    S.pads[pad] = Object.assign(emptyPad(), {name: srcCopy.name.slice(0, 12) + ' ' + (k + 1), L, R, end: L.length, bus: srcCopy.bus}); sendPad(pad); });
+  S.bank = Math.floor(dest / 16); S.sel = dest; send({t: 'sel', pad: dest});
+  $('chopRow').hidden = true; $('chopBtn').classList.remove('on');
+  renderAll(); toast('CHOPPED ' + cuts.length + ' → BANK ' + BANKS[S.bank]);
+}
+async function exportWav(){
+  const p = S.pads[S.sel]; if (!p.L) { toast('This pad is empty'); return; }
+  const L = p.L.subarray(p.start, p.end), R = p.R ? p.R.subarray(p.start, p.end) : null, ch = R ? 2 : 1, n = L.length;
+  const buf = new ArrayBuffer(44 + n * ch * 2), v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + n * ch * 2, true); ws(8, 'WAVE'); ws(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); ws(36, 'data'); v.setUint32(40, n * ch * 2, true);
+  let o = 44; for (let i = 0; i < n; i++) { for (let c = 0; c < ch; c++) { const s = Math.max(-1, Math.min(1, (c ? R : L)[i])); v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true); o += 2; } }
+  const filename = (p.name || padId(S.sel)).replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.wav';
+  const data = new Uint8Array(buf);
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { await dl.save({filename, data: new Blob([data], {type: 'audio/wav'})}); return; }
+  } catch (e) { if (e && e.code && e.code !== 'unavailable') { toast('Export cancelled'); return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], {type: 'audio/wav'})); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+/* ═════════════ keyboard & MIDI ═════════════ */
+const KEYMAP = ['1', '2', '3', '4', 'q', 'w', 'e', 'r', 'a', 's', 'd', 'f', 'z', 'x', 'c', 'v'];
+const keyHeld = new Set();
+window.addEventListener('keydown', e => {
+  if (e.target.closest && e.target.closest('input,textarea,[role=slider]')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'Space' && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); ensureAudio(); setPlay(!S.playing); return; }
+  const k = KEYMAP.indexOf(e.key.toLowerCase()); if (k < 0 || e.repeat || keyHeld.has(k)) return;
+  keyHeld.add(k); padDown(S.bank * 16 + k, 1); padEls[k].classList.add('hit');
+});
+window.addEventListener('keyup', e => { const k = KEYMAP.indexOf(e.key.toLowerCase()); if (k < 0 || !keyHeld.has(k)) return; keyHeld.delete(k); padEls[k].classList.remove('hit'); padUp(S.bank * 16 + k); });
+if (navigator.requestMIDIAccess) {
+  navigator.requestMIDIAccess().then(m => { const bind = () => m.inputs.forEach(inp => inp.onmidimessage = ev => { const [st, n, v] = ev.data; const c = st & 0xf0;
+    if (n < 36 || n > 51) return; const pad = S.bank * 16 + (n - 36);
+    if (c === 0x90 && v > 0) padDown(pad, v / 127); else if (c === 0x80 || (c === 0x90 && v === 0)) padUp(pad); });
+    bind(); m.onstatechange = bind; }).catch(() => {});
+}
+document.addEventListener('pointerdown', () => ensureAudio(), {once: true, capture: true});
+
+/* ═════════════ go ═════════════ */
+function renderAll(){ renderPads(); renderEdit(); renderCtl(); drawSeq(); renderLcd(); }
+buildPads(); buildFx(); buildEdit(); buildCtl();
+renderAll(); lcdFlash('LOADING KITS ...', 0);
+setTimeout(() => { buildKit(); syncAll(); lcdMsg = ''; renderAll(); }, 40);
+new ResizeObserver(() => { const p = S.pads[S.sel]; if (p) p.peaks = null; drawWave(); }).observe(wave);
+if (document.fonts) document.fonts.ready.then(drawWave);
+</script>
+
+</body>
+</html>

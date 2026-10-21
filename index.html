@@ -92,6 +92,7 @@ h1 {
   background: #07080f;
   display: block;
 }
+.cover.smooth { image-rendering: auto; }
 .body { min-width: 0; display: grid; gap: 8px; }
 .name { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
 .desc { margin: 0; color: var(--muted); }
@@ -157,6 +158,22 @@ footer a { color: inherit; }
             <li>180 px grid</li>
             <li>touch + keys</li>
             <li>EN · 한국어</li>
+          </ul>
+          <span class="play">Play →</span>
+        </div>
+      </a>
+    </li>
+    <li>
+      <a class="app" href="./crate16/">
+        <img class="cover smooth" src="./crate16/cover.png" width="288" height="512" alt="CRATE-16 sampler: an amber LCD showing a kick waveform above bank buttons and a 4×4 grid of rubber pads, two of them lit">
+        <div class="body">
+          <h2 class="name">CRATE-16</h2>
+          <p class="desc">A groove sampler and effector. Play 16 pads across 10 banks, route them through two FX buses, sequence 15 genre patterns, then resample and chop your own sounds.</p>
+          <ul class="facts" aria-label="Build facts">
+            <li>AssemblyScript → wasm32</li>
+            <li>37 KB binary</li>
+            <li>AudioWorklet</li>
+            <li>touch + keys + MIDI</li>
           </ul>
           <span class="play">Play →</span>
         </div>
