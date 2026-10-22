@@ -13,6 +13,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | RETRO//TRACK | `/retrotrack/` | private repo `alxpark/retrotrack` (`./build.sh` → `dist/index.html`) |
 | Stemline | `/stemline/` | private repo `alxpark/stemline` (`./build.sh` → `dist/stemline.html`) |
 | Stepcraft 12 | `/stepcraft12/` | private repo `alxpark/stepcraft12` (`./build.sh` → `stepcraft12.html`) |
+| PixelForge | `/pixel-forge/` | repo `alxpark/pixel-forge` (`npm run build` → `dist/index.html`) |
 
 ## Adding an app
 
