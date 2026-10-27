@@ -20,6 +20,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Swarm & Spiral | `/swarm-and-spiral/` | repo `alxpark/swarm-and-spiral` (`./build.sh` → `index.html`) |
 | Kiln Sandbox | `/kiln-sandbox/` | private repo `alxpark/kiln-sandbox` (`./build.sh` → `build/index.html`) |
 | Darkroom Filter Lab | `/darkroom-filter-lab/` | private repo `alxpark/darkroom-filter-lab` (`./build.sh` → `dist/index.html`) |
+| Rust NES Workbench | `/nes/` | private repo `alxpark/nes-wasm` (`python3 web/bundle.py . --site` → `dist/index.html`) |
 
 ## Adding an app
 
