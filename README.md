@@ -16,6 +16,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | PixelForge | `/pixel-forge/` | repo `alxpark/pixel-forge` (`npm run build` → `dist/index.html`) |
 | 바코드 키링 메이커 | `/barcode-keyring-maker/` | repo `alxpark/barcode-keyring-maker` (`cd web && npm run build:single` → `single/index.html`) |
 | Mandelbrot Dive | `/mandelbrot-dive/` | private repo `alxpark/mandelbrot-dive` (`./build.sh` → `docs/index.html`) |
+| WASM Pedalboard | `/wasm-pedalboard/` | private repo `alxpark/wasm-pedalboard` (`./build.sh` → `index.html`) |
 
 ## Adding an app
 
