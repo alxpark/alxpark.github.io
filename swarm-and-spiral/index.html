@@ -1,0 +1,301 @@
+<title>Swarm &amp; Spiral</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed canvas as the stage; one glass control slab docked bottom-left, a wordmark top-left. Single committed night look. */
+:root {
+  --ink: #05070f;
+  --glass: rgba(14, 18, 34, 0.72);
+  --line: rgba(160, 176, 230, 0.16);
+  --fg: #e8ebf7;
+  --muted: #8d95b3;
+  --accent: #f2b45a;
+  --accent-ink: #1a1206;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--fg); font-family: var(--display); overflow: hidden; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; background: var(--ink); }
+
+.mark {
+  position: fixed; top: calc(14px + env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px));
+  pointer-events: none; display: grid; gap: 2px;
+}
+.mark h1 { margin: 0; font-size: clamp(22px, 3.2vw, 34px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; text-wrap: balance; }
+.mark h1 em { font-style: normal; color: var(--accent); }
+.mark p { margin: 0; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+
+.stats {
+  position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; pointer-events: none;
+  font-variant-numeric: tabular-nums; line-height: 1.6;
+}
+.stats b { color: var(--fg); font-weight: 500; }
+
+.panel {
+  position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  width: min(320px, calc(100vw - 32px)); background: var(--glass); border: 1px solid var(--line); border-radius: 14px;
+  backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+  padding: 12px; display: grid; gap: 12px; font-size: 13px;
+}
+.row { display: flex; gap: 8px; align-items: center; }
+.label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 9px; padding: 2px; gap: 2px; }
+.seg button {
+  font: 500 13px/1 var(--display); color: var(--muted); background: transparent; border: 0; border-radius: 7px;
+  padding: 8px 4px; cursor: pointer; transition: background .15s, color .15s;
+}
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.icon {
+  font: 500 12px/1 var(--mono); color: var(--fg); background: rgba(255,255,255,0.06); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer; white-space: nowrap;
+}
+.icon:hover { background: rgba(255,255,255,0.12); }
+
+.sliders { display: grid; gap: 9px; }
+.slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
+.slider label { font-size: 12.5px; color: var(--fg); }
+.slider output { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; height: 18px; }
+
+.note { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.note kbd { font-family: var(--mono); font-size: 10.5px; color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+.panel.collapsed .sliders, .panel.collapsed .note, .panel.collapsed .toolrow { display: none; }
+
+@media (max-width: 520px) {
+  .mark p { display: none; }
+  .panel { padding: 10px; gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .seg button { transition: none; } }
+</style>
+
+<canvas id="stage" aria-label="Particle simulation. Press and drag to disturb the particles."></canvas>
+
+<div class="mark">
+  <h1>Swarm <em>&amp;</em> Spiral</h1>
+  <p id="sub">WebAssembly · press &amp; drag to poke</p>
+</div>
+
+<div class="stats" aria-live="off">
+  <div><b id="sN">0</b> particles</div>
+  <div><b id="sFps">0</b> fps · wasm <b id="sMs">0</b> ms</div>
+</div>
+
+<div class="panel" id="panel">
+  <div class="row">
+    <div class="seg" role="group" aria-label="Simulation">
+      <button id="m0" data-mode="0" aria-pressed="true">Flock</button>
+      <button id="m1" data-mode="1">Galaxy</button>
+      <button id="m2" data-mode="2">Collision</button>
+    </div>
+    <button class="icon" id="tune" aria-expanded="true" aria-controls="panel" title="Show or hide controls">Tune</button>
+  </div>
+
+  <div class="row toolrow">
+    <span class="label">Poke</span>
+    <div class="seg" role="group" aria-label="Pointer tool">
+      <button id="t0" data-tool="0" aria-pressed="true">Attract</button>
+      <button id="t1" data-tool="1">Repel</button>
+      <button id="t2" data-tool="2">Swirl</button>
+    </div>
+  </div>
+
+  <div class="sliders" id="sliders"></div>
+
+  <div class="row toolrow">
+    <button class="icon" id="reset">Reset</button>
+    <button class="icon" id="pause">Pause</button>
+    <span class="label" style="margin-left:auto" id="modeNote">Reynolds 1987</span>
+  </div>
+
+  <p class="note" id="help"></p>
+</div>
+
+<script>
+const WASM_B64 = "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";
+
+(async () => {
+  const bytes = Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0));
+  const { instance } = await WebAssembly.instantiate(bytes, { env: { sin: Math.sin, cos: Math.cos, log: Math.log } });
+  const w = instance.exports;
+  const MAXW = w.max_w(), MAXH = w.max_h();
+
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let W = 0, H = 0, image = null;
+
+  const PARAM = { sep: 0, align: 1, coh: 2, speed: 3, view: 4, trail: 5, bright: 6, tool: 7, time: 8 };
+
+  // Per-mode slider sets. Values are in the simulation's own units (px, px/frame).
+  const MODES = [
+    { name: 'Flock', note: 'Reynolds 1987', count: 5000,
+      help: 'Each bird steers by three local rules: keep apart, match heading, move toward the group. Colour shows heading. Press and drag to poke; right-click repels. Keys <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> switch, <kbd>Space</kbd> pauses, <kbd>R</kbd> resets.',
+      sliders: [
+        { id: 'count', label: 'Birds', min: 500, max: 20000, step: 500, val: 5000, fmt: v => v.toLocaleString() },
+        { id: 'sep', label: 'Separation', min: 0, max: 4, step: 0.05, val: 1.6, fmt: v => v.toFixed(2) },
+        { id: 'align', label: 'Alignment', min: 0, max: 3, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) },
+        { id: 'coh', label: 'Cohesion', min: 0, max: 3, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) },
+        { id: 'view', label: 'View radius', min: 12, max: 48, step: 1, val: 22, fmt: v => v + ' px' },
+        { id: 'speed', label: 'Top speed', min: 0.8, max: 5, step: 0.1, val: 2.4, fmt: v => v.toFixed(1) + ' px/f' },
+        { id: 'trail', label: 'Trails', min: 0, max: 0.95, step: 0.01, val: 0.72, fmt: v => Math.round(v * 100) + '%' },
+      ] },
+    { name: 'Galaxy', note: 'Two-arm disc', count: 24000,
+      help: 'Stars orbit a softened central mass, so the inner disc turns faster and the arms wind up over time. Pressing drops a black hole where you touch. Hit Reset to unwind the arms.',
+      sliders: [
+        { id: 'count', label: 'Stars', min: 2000, max: 40000, step: 1000, val: 24000, reseed: true, fmt: v => v.toLocaleString() },
+        { id: 'time', label: 'Time step', min: 0.1, max: 3, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) + '×' },
+        { id: 'tool', label: 'Hole mass', min: 0.2, max: 4, step: 0.1, val: 1.0, fmt: v => v.toFixed(1) + ' M' },
+        { id: 'bright', label: 'Exposure', min: 0.3, max: 2.5, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) },
+        { id: 'trail', label: 'Trails', min: 0, max: 0.95, step: 0.01, val: 0.55, fmt: v => Math.round(v * 100) + '%' },
+      ] },
+    { name: 'Collision', note: 'Toomre & Toomre 1972', count: 30000,
+      help: 'Two discs on a prograde, bound orbit. Tidal forces at closest approach throw out long tails and a bridge, as in the Antennae and the Mice. The cores slowly merge.',
+      sliders: [
+        { id: 'count', label: 'Stars', min: 2000, max: 40000, step: 1000, val: 30000, reseed: true, fmt: v => v.toLocaleString() },
+        { id: 'time', label: 'Time step', min: 0.1, max: 3, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) + '×' },
+        { id: 'tool', label: 'Hole mass', min: 0.2, max: 4, step: 0.1, val: 1.0, fmt: v => v.toFixed(1) + ' M' },
+        { id: 'bright', label: 'Exposure', min: 0.3, max: 2.5, step: 0.05, val: 1.0, fmt: v => v.toFixed(2) },
+        { id: 'trail', label: 'Trails', min: 0, max: 0.95, step: 0.01, val: 0.55, fmt: v => Math.round(v * 100) + '%' },
+      ] },
+  ];
+
+  let mode = 0, tool = 0, paused = false, count = MODES[0].count;
+  const state = MODES.map(m => Object.fromEntries(m.sliders.map(s => [s.id, s.val])));
+
+  function sizeCanvas() {
+    const r = canvas.getBoundingClientRect();
+    const scale = Math.min(window.devicePixelRatio || 1, 1.25);
+    W = Math.max(16, Math.min(MAXW, Math.round(r.width * scale)));
+    H = Math.max(16, Math.min(MAXH, Math.round(r.height * scale)));
+    canvas.width = W; canvas.height = H;
+  }
+  function bindImage() {
+    image = new ImageData(new Uint8ClampedArray(w.memory.buffer, w.fb_ptr(), W * H * 4), W, H);
+  }
+  function pushParams() {
+    const s = state[mode];
+    // defaults for params a mode does not expose
+    w.set_param(PARAM.bright, s.bright ?? 1);
+    w.set_param(PARAM.tool, s.tool ?? 1);
+    w.set_param(PARAM.time, s.time ?? 1);
+    for (const k of ['sep', 'align', 'coh', 'speed', 'view', 'trail']) if (k in s) w.set_param(PARAM[k], s[k]);
+  }
+  function reset() {
+    count = state[mode].count;
+    pushParams();
+    w.reset(W, H, mode, count, (Math.random() * 4e9) >>> 0 || 1);
+    bindImage();
+  }
+
+  // ---- UI ----
+  const slidersEl = document.getElementById('sliders');
+  function buildSliders() {
+    slidersEl.replaceChildren();
+    for (const s of MODES[mode].sliders) {
+      const wrap = document.createElement('div'); wrap.className = 'slider';
+      const id = `s-${mode}-${s.id}`;
+      wrap.innerHTML = `<label for="${id}">${s.label}</label><output for="${id}"></output>
+        <input type="range" id="${id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+      const input = wrap.querySelector('input'), out = wrap.querySelector('output');
+      input.value = state[mode][s.id]; out.textContent = s.fmt(+input.value);
+      input.addEventListener('input', () => {
+        const v = +input.value; state[mode][s.id] = v; out.textContent = s.fmt(v);
+        if (s.id === 'count') {
+          if (s.reseed) { clearTimeout(input._t); input._t = setTimeout(reset, 180); }
+          else { w.set_count(v); count = v; }
+        } else w.set_param(PARAM[s.id], v);
+      });
+      slidersEl.appendChild(wrap);
+    }
+    document.getElementById('help').innerHTML = MODES[mode].help;
+    document.getElementById('modeNote').textContent = MODES[mode].note;
+  }
+  function setMode(m) {
+    mode = m;
+    document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === m)));
+    buildSliders(); reset();
+  }
+  function setTool(t) {
+    tool = t;
+    document.querySelectorAll('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.tool === t)));
+  }
+  function setPaused(p) { paused = p; document.getElementById('pause').textContent = p ? 'Play' : 'Pause'; }
+
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(+b.dataset.mode)));
+  document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(+b.dataset.tool)));
+  document.getElementById('reset').addEventListener('click', reset);
+  document.getElementById('pause').addEventListener('click', () => setPaused(!paused));
+  const panel = document.getElementById('panel'), tune = document.getElementById('tune');
+  function setCollapsed(c) { panel.classList.toggle('collapsed', c); tune.setAttribute('aria-expanded', String(!c)); }
+  tune.addEventListener('click', () => setCollapsed(!panel.classList.contains('collapsed')));
+  if (window.innerWidth < 520 || window.innerHeight < 560) setCollapsed(true);
+
+  window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' && e.key !== ' ') return;
+    if (e.key === '1' || e.key === '2' || e.key === '3') setMode(+e.key - 1);
+    else if (e.key === ' ') { e.preventDefault(); setPaused(!paused); }
+    else if (e.key === 'r' || e.key === 'R') reset();
+  });
+
+  // ---- pointer ----
+  const ptr = { x: 0, y: 0, down: false, button: 0, id: null };
+  function toSim(e) {
+    const r = canvas.getBoundingClientRect();
+    ptr.x = (e.clientX - r.left) * W / r.width; ptr.y = (e.clientY - r.top) * H / r.height;
+  }
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    toSim(e); ptr.down = true; ptr.button = e.button; ptr.id = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+  });
+  canvas.addEventListener('pointermove', e => { if (ptr.id === null || e.pointerId === ptr.id) toSim(e); });
+  const up = e => { if (e.pointerId === ptr.id) { ptr.down = false; ptr.id = null; } };
+  canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+
+  // ---- loop ----
+  const sN = document.getElementById('sN'), sFps = document.getElementById('sFps'), sMs = document.getElementById('sMs');
+  let last = performance.now(), acc = 0, frames = 0, msAcc = 0, statT = last;
+  function frame(now) {
+    const dt = Math.min(3, (now - last) / (1000 / 60)); last = now;
+    const activeTool = ptr.down && ptr.button === 2 ? 1 : tool;
+    w.set_pointer(ptr.x, ptr.y, ptr.down ? 1 : 0, activeTool);
+    const t0 = performance.now();
+    w.step(dt, paused ? 1 : 0);
+    msAcc += performance.now() - t0; frames++;
+    ctx.putImageData(image, 0, 0);
+    if (now - statT > 500) {
+      sFps.textContent = Math.round(frames * 1000 / (now - statT));
+      sMs.textContent = (msAcc / frames).toFixed(1);
+      sN.textContent = w.count().toLocaleString();
+      frames = 0; msAcc = 0; statT = now;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  let resizeT;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => { sizeCanvas(); w.resize(W, H); bindImage(); }, 120);
+  });
+
+  sizeCanvas();
+  // Scale the starting flock to the screen so a phone isn't carpeted with birds.
+  { const n = Math.round(Math.min(8000, Math.max(1500, W * H / 200)) / 500) * 500;
+    state[0].count = n; mode === 0 && (count = n); }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) state.forEach(s => { if ('time' in s) s.time = 0.5; if ('speed' in s) s.speed = 1.6; });
+  setMode(0);
+  // run a short warm-up so the first frame already shows a formed flock
+  for (let i = 0; i < 90; i++) w.step(1, 0);
+  requestAnimationFrame(t => { last = t; statT = t; frame(t); });
+})().catch(err => {
+  document.getElementById('sub').textContent = 'This browser could not start WebAssembly: ' + err.message;
+});
+</script>
