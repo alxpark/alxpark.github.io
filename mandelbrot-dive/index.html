@@ -50,6 +50,8 @@ body {
 }
 .brand h1 span { color: var(--accent); }
 .brand small { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; }
+.ver { color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ver b { color: var(--accent); font-weight: 600; }
 
 .readout {
   padding: 8px 12px; display: grid; grid-template-columns: auto auto; gap: 1px 12px;
@@ -102,6 +104,7 @@ select option { background: #151824; }
   <div class="panel brand">
     <h1>Mandelbrot <span>Dive</span></h1>
     <small>z ↦ z² + c · WebAssembly core</small>
+    <span class="ver"><b>v1.0.0</b> · deployed <time id="built" datetime="2026-10-27T18:17:33Z">2026-10-27T18:17:33Z</time></span>
   </div>
   <dl class="panel readout" id="readout">
     <dt>Re</dt><dd id="re">−0.5</dd>
@@ -159,6 +162,19 @@ const PLACES = [
 ];
 
 const HOME = { re: -0.6, im: 0, w: 3.4 };
+
+// Show the deploy time in the viewer's own time zone.
+(function showBuilt() {
+  const el = document.getElementById("built"), d = new Date(el.dateTime);
+  if (isNaN(d)) return;
+  try {
+    el.textContent = new Intl.DateTimeFormat(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit", timeZoneName: "short"
+    }).format(d);
+  } catch (e) { el.textContent = d.toISOString().slice(0, 16).replace("T", " ") + " UTC"; }
+  el.title = d.toISOString();
+})();
 
 (async function main() {
   const bytes = Uint8Array.from(atob(WASM_B64), ch => ch.charCodeAt(0));
