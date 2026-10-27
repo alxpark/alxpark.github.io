@@ -19,6 +19,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | WASM Pedalboard | `/wasm-pedalboard/` | private repo `alxpark/wasm-pedalboard` (`./build.sh` → `index.html`) |
 | Swarm & Spiral | `/swarm-and-spiral/` | repo `alxpark/swarm-and-spiral` (`./build.sh` → `index.html`) |
 | Kiln Sandbox | `/kiln-sandbox/` | private repo `alxpark/kiln-sandbox` (`./build.sh` → `build/index.html`) |
+| Darkroom Filter Lab | `/darkroom-filter-lab/` | private repo `alxpark/darkroom-filter-lab` (`./build.sh` → `dist/index.html`) |
 
 ## Adding an app
 

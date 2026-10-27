@@ -1,0 +1,601 @@
+<title>Darkroom Filter Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: darkroom bench — a large print stage on the left, an instrument panel of
+   effect "trays" on the right; stacks to stage-over-panel on phones. */
+:root {
+  --bg: #f3efe9;          /* contact-sheet paper */
+  --surface: #fbf9f6;
+  --ink: #221d1b;
+  --muted: #6e6460;
+  --line: #ddd4cc;
+  --accent: #c2361f;      /* grease-pencil / safelight red */
+  --accent-ink: #ffffff;
+  --stage: #2a2523;
+  --checker: #34302d;
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171312; --surface: #201b19; --ink: #efe6e1; --muted: #a39690; --line: #3a3230;
+  --accent: #ff5a3c; --accent-ink: #1a0c08; --stage: #0e0b0a; --checker: #161210; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171312; --surface: #201b19; --ink: #efe6e1; --muted: #a39690; --line: #3a3230;
+  --accent: #ff5a3c; --accent-ink: #1a0c08; --stage: #0e0b0a; --checker: #161210; color-scheme: dark }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 24px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(20px, 3.2vw, 30px); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.tag { font-family: var(--mono); font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.tag b { color: var(--ink); font-weight: 500; }
+.ver { color: var(--accent); white-space: nowrap; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+
+.bench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+/* Stage */
+.stage {
+  position: relative; background: var(--stage); border-radius: 6px; min-height: 320px;
+  display: grid; place-items: center; overflow: hidden;
+  background-image: conic-gradient(var(--checker) 25%, transparent 0 50%, var(--checker) 0 75%, transparent 0);
+  background-size: 22px 22px;
+}
+.stage.drag { outline: 3px dashed var(--accent); outline-offset: -10px; }
+.view { position: relative; max-width: 100%; line-height: 0; }
+.view canvas, .view img { display: block; max-width: 100%; max-height: min(72vh, 760px); width: auto; height: auto; }
+#saveImg { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; opacity: 0; }
+#orig { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; }
+.stage-bar {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px;
+  justify-content: space-between; align-items: center; pointer-events: none;
+}
+.stage-bar > * { pointer-events: auto; }
+.chip {
+  font-family: var(--mono); font-size: 11.5px; color: #f3ebe6; background: rgba(14, 10, 9, .72);
+  padding: 5px 9px; border-radius: 4px; backdrop-filter: blur(6px); line-height: 1.3;
+}
+.chip b { color: #ff8a70; font-weight: 500; }
+.btn-ghost {
+  font: 500 12.5px var(--body); color: #f3ebe6; background: rgba(14, 10, 9, .72); border: 1px solid rgba(255,255,255,.18);
+  padding: 6px 11px; border-radius: 4px; cursor: pointer; backdrop-filter: blur(6px); user-select: none; -webkit-user-select: none;
+  touch-action: none;
+}
+.btn-ghost:hover { border-color: #ff8a70; }
+
+/* Panel */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; }
+.panel section { padding: 14px 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.panel section:first-child { border-top: 0; }
+.label { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+.drop {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+}
+.drop label.file {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600;
+  background: var(--accent); color: var(--accent-ink); padding: 8px 14px; border-radius: 4px;
+}
+.drop label.file:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.hint { font-size: 12.5px; color: var(--muted); }
+
+.trays { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+@media (max-width: 400px) { .trays { grid-template-columns: repeat(3, 1fr); } }
+.tray {
+  font: 500 12px var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  border-radius: 4px; padding: 8px 2px 7px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.tray svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.tray:hover { border-color: var(--accent); }
+.tray[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tray:focus-visible, .btn:focus-visible, .btn-ghost:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.ctl label { font-size: 13px; font-weight: 500; }
+.ctl output { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ctl input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg button { font: 500 12px var(--body); background: transparent; color: var(--ink); border: 0; padding: 6px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+select { font: 13px var(--body); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.btn {
+  font: 600 12.5px var(--body); background: transparent; color: var(--ink); border: 1px solid var(--ink);
+  padding: 6px 12px; border-radius: 4px; cursor: pointer;
+}
+.btn:hover { background: var(--ink); color: var(--bg); }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.foot { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.foot code { font-family: var(--mono); font-size: 11.5px; }
+.stack-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.stack { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; counter-reset: layer; }
+.layer {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg); padding: 2px 2px 2px 0;
+}
+.layer[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.layer.off .pick { opacity: .45; }
+.pick {
+  counter-increment: layer; display: flex; align-items: center; gap: 8px; min-width: 0; text-align: left;
+  background: transparent; border: 0; color: var(--ink); font: 600 13px var(--body); padding: 6px 4px 6px 10px; cursor: pointer;
+}
+.pick::before { content: counter(layer); font: 500 11px var(--mono); color: var(--muted); width: 12px; }
+.pick svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.pick .txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pick small { font: 400 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tools { display: flex; align-items: center; gap: 1px; }
+.tools .ms { font: 11px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; padding-right: 4px; }
+.ib {
+  width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 3px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.ib svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.ib:hover:not(:disabled) { color: var(--ink); background: var(--line); }
+.ib:disabled { opacity: .3; cursor: default; }
+.ib:focus-visible, .pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.editing { display: flex; gap: 8px; align-items: baseline; padding: 12px 16px 0; border-top: 1px solid var(--line); }
+.editing b { font-family: var(--display); font-weight: 500; font-size: 14px; }
+.editing ~ section[data-panel] { border-top: 0; }
+@media (max-width: 400px) { .tools .ms { display: none; } }
+#toast { font-family: var(--mono); font-size: 12px; color: var(--accent); min-height: 1em; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Darkroom <span>Filter</span> Lab</h1>
+    <div class="tag">
+      <span><span class="dot"></span><b id="engine">loading WebAssembly…</b></span>
+      <span>Your photo never leaves this tab</span>
+      <span class="ver" title="build 79b519d">v1.0.0 · deployed 2026-10-28</span>
+    </div>
+  </header>
+
+  <div class="bench">
+    <div class="stage" id="stage">
+      <div class="view" id="view">
+        <canvas id="out" aria-label="Filtered image"></canvas>
+        <img id="saveImg" alt="Filtered image (right-click or long-press to save)">
+        <canvas id="orig" hidden aria-hidden="true"></canvas>
+      </div>
+      <div class="stage-bar">
+        <span class="chip" id="stats">—</span>
+        <button class="btn-ghost" id="compare" type="button">Hold to compare</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <section class="drop">
+        <p class="label">Image</p>
+        <label class="file"><input type="file" id="file" accept="image/*">Choose photo</label>
+        <span class="hint">…or drop it on the stage, or paste with ⌘V / Ctrl+V. The sample is a generated sunset.</span>
+      </section>
+
+      <section>
+        <div class="stack-head"><p class="label">Stack</p><span class="hint">Runs top to bottom</span></div>
+        <ol class="stack" id="stack" aria-label="Effect stack"></ol>
+        <p class="hint" id="stackEmpty" hidden>No effects yet. Add one below and it runs on the original photo.</p>
+        <p class="label">Add effect</p>
+        <div class="trays" role="group" aria-label="Add effect">
+          <button class="tray" data-fx="blur" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8" stroke-dasharray="2 3"/></svg>Blur</button>
+          <button class="tray" data-fx="edges" type="button"><svg viewBox="0 0 24 24"><path d="M3 18 9 7l4 7 3-4 5 8z"/></svg>Edges</button>
+          <button class="tray" data-fx="sort" type="button"><svg viewBox="0 0 24 24"><path d="M5 4v16M10 8v12M15 12v8M20 16v4"/></svg>Sort</button>
+          <button class="tray" data-fx="ascii" type="button"><svg viewBox="0 0 24 24"><path d="M6 17 9 7l3 10M7 14h4M15 9h4M15 13h4M15 17h4"/></svg>ASCII</button>
+          <button class="tray" data-fx="glitch" type="button"><svg viewBox="0 0 24 24"><path d="M3 6h12M7 10h14M3 14h9M9 18h12"/></svg>Glitch</button>
+        </div>
+      </section>
+
+      <div class="editing" id="editing" hidden><span class="label">Editing</span><b id="editName"></b></div>
+
+      <!-- Blur -->
+      <section data-panel="blur" hidden>
+        <div class="ctl"><label for="blurR">Radius</label><output id="blurRo"></output><input type="range" id="blurR" min="0" max="60" value="14"></div>
+        <p class="foot">Three passes of a separable box blur, which converges on a Gaussian. Cost stays flat as the radius grows.</p>
+      </section>
+
+      <!-- Edges -->
+      <section data-panel="edges" hidden>
+        <div class="ctl"><label for="edgeS">Strength</label><output id="edgeSo"></output><input type="range" id="edgeS" min="4" max="64" value="20"></div>
+        <div class="ctl"><label for="edgeT">Noise floor</label><output id="edgeTo"></output><input type="range" id="edgeT" min="0" max="120" value="18"></div>
+        <div class="row"><span class="label">Render</span>
+          <div class="seg" id="edgeMode"><button data-v="0" aria-pressed="true" type="button">Glow</button><button data-v="1" aria-pressed="false" type="button">Ink</button><button data-v="2" aria-pressed="false" type="button">Colour</button></div>
+        </div>
+        <p class="foot">3×3 Sobel operator on luminance.</p>
+      </section>
+
+      <!-- Sort -->
+      <section data-panel="sort" hidden>
+        <div class="ctl"><label for="sortLo">Lower threshold</label><output id="sortLoo"></output><input type="range" id="sortLo" min="0" max="255" value="70"></div>
+        <div class="ctl"><label for="sortHi">Upper threshold</label><output id="sortHio"></output><input type="range" id="sortHi" min="0" max="255" value="225"></div>
+        <div class="row"><span class="label">Direction</span>
+          <div class="seg" id="sortDir"><button data-v="0" aria-pressed="false" type="button">Rows</button><button data-v="1" aria-pressed="true" type="button">Columns</button></div>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="sortRev">Light first</label>
+          <label class="check"><input type="checkbox" id="sortInv">Sort outside range</label>
+        </div>
+        <p class="foot">Runs of pixels whose brightness falls between the thresholds get sorted by brightness, with a counting sort, so each run is linear time.</p>
+      </section>
+
+      <!-- ASCII -->
+      <section data-panel="ascii" hidden>
+        <div class="ctl"><label for="asciiCols">Columns</label><output id="asciiColso"></output><input type="range" id="asciiCols" min="30" max="220" value="110"></div>
+        <div class="ctl"><label for="asciiCon">Contrast</label><output id="asciiCono"></output><input type="range" id="asciiCon" min="8" max="40" value="20"></div>
+        <div class="row"><span class="label">Ramp</span>
+          <select id="asciiRamp" aria-label="Character ramp">
+            <option value=" .:-=+*#%@">Classic  .:-=+*#%@</option>
+            <option value=" .'`^,:;Il!i><~+_-?][}{1)(|tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$">Dense (70 chars)</option>
+            <option value=" ░▒▓█">Blocks ░▒▓█</option>
+            <option value=" ·•●">Dots ·•●</option>
+            <option value=" 01">Binary 01</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="asciiColor" checked>Colour</label>
+          <label class="check"><input type="checkbox" id="asciiPaper">Paper background</label>
+        </div>
+        <div class="row"><button class="btn" id="copyAscii" type="button">Copy as text</button><span id="toast" role="status"></span></div>
+      </section>
+
+      <!-- Glitch -->
+      <section data-panel="glitch" hidden>
+        <div class="ctl"><label for="glShift">RGB split</label><output id="glShifto"></output><input type="range" id="glShift" min="0" max="60" value="12"></div>
+        <div class="ctl"><label for="glSlices">Slice tears</label><output id="glSliceso"></output><input type="range" id="glSlices" min="0" max="80" value="22"></div>
+        <div class="ctl"><label for="glScan">Scanlines</label><output id="glScano"></output><input type="range" id="glScan" min="0" max="120" value="40"></div>
+        <div class="ctl"><label for="glNoise">Noise</label><output id="glNoiseo"></output><input type="range" id="glNoise" min="0" max="80" value="14"></div>
+        <div class="row"><button class="btn" id="reroll" type="button">Reroll tears</button><label class="check"><input type="checkbox" id="glLive">Live signal</label></div>
+      </section>
+
+      <section>
+        <p class="foot">Effects run top to bottom, each feeding the next. Filters are C compiled to an 8&nbsp;KB WebAssembly module embedded in this page. To keep the result, right-click or long-press the image and save it.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const WASM_B64 = "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";
+const MAX_SIDE = 1600, MAX_LAYERS = 8;
+const $ = id => document.getElementById(id);
+const out = $("out"), orig = $("orig"), saveImg = $("saveImg");
+const octx = out.getContext("2d", { willReadFrequently: true });
+const origCtx = orig.getContext("2d", { willReadFrequently: true });
+const textCanvas = document.createElement("canvas"), tctx = textCanvas.getContext("2d");
+
+let imgLabel = "sample";
+let wasm, mem, W = 0, H = 0, N = 0, SRC = 0, BUF = [0, 0], TMP = 0, asciiText = "";
+
+// ---------- Effect catalogue ----------
+const newSeed = () => (Math.random() * 4294967295) >>> 0 || 1;
+const FX = {
+  blur:   { name: "Blur",   defaults: () => ({ r: 14 }),
+            summary: p => `radius ${p.r}` },
+  edges:  { name: "Edges",  defaults: () => ({ s: 20, t: 18, mode: 0 }),
+            summary: p => `${["glow", "ink", "colour"][p.mode]} · ×${(p.s / 16).toFixed(2)}` },
+  sort:   { name: "Sort",   defaults: () => ({ lo: 70, hi: 225, dir: 1, rev: false, inv: false }),
+            summary: p => `${p.lo}–${p.hi} · ${p.dir ? "columns" : "rows"}${p.inv ? " · outside" : ""}` },
+  ascii:  { name: "ASCII",  defaults: () => ({ cols: 110, con: 20, ramp: " .:-=+*#%@", color: true, paper: false }),
+            summary: p => `${p.cols} cols · ${[...p.ramp].length - 1} glyphs` },
+  glitch: { name: "Glitch", defaults: () => ({ shift: 12, slices: 22, scan: 40, noise: 14, live: false, seed: newSeed() }),
+            summary: p => `split ${p.shift} · ${p.slices} tears${p.live ? " · live" : ""}` },
+};
+// form control id -> param key, per effect
+const CTRL = {
+  blur:   { blurR: "r" },
+  edges:  { edgeS: "s", edgeT: "t", edgeMode: "mode" },
+  sort:   { sortLo: "lo", sortHi: "hi", sortDir: "dir", sortRev: "rev", sortInv: "inv" },
+  ascii:  { asciiCols: "cols", asciiCon: "con", asciiRamp: "ramp", asciiColor: "color", asciiPaper: "paper" },
+  glitch: { glShift: "shift", glSlices: "slices", glScan: "scan", glNoise: "noise", glLive: "live" },
+};
+const ICONS = Object.fromEntries([...document.querySelectorAll(".tray")].map(b => [b.dataset.fx, b.querySelector("svg").outerHTML]));
+const SVG = {
+  eye: '<svg viewBox="0 0 24 24"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.1A10 10 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3 3.6M6.4 6.9C3.7 8.6 2 12 2 12s3.6 6 10 6a9.5 9.5 0 0 0 4.2-.9"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M6 14l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></svg>',
+  del: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+
+let uid = 0;
+const makeLayer = fx => ({ id: ++uid, fx, on: true, p: FX[fx].defaults(), ms: 0 });
+// Opening stack shows chaining: columns sorted, then a light glitch over the top.
+const layers = [makeLayer("sort"), Object.assign(makeLayer("glitch"), { p: { shift: 6, slices: 10, scan: 30, noise: 8, live: false, seed: 1337 } })];
+let selected = layers[0].id;
+const sel = () => layers.find(l => l.id === selected);
+
+// ---------- Boot ----------
+async function boot() {
+  const bytes = Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0));
+  const { instance } = await WebAssembly.instantiate(bytes);
+  wasm = instance.exports; mem = wasm.memory;
+  $("engine").textContent = `WebAssembly · ${(bytes.length / 1024).toFixed(1)} KB`;
+  bindControls();
+  renderStack(); showPanel();
+  loadImage(sampleScene());
+}
+
+function loadImage(source) {
+  const w = source.naturalWidth || source.width, h = source.naturalHeight || source.height;
+  const scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+  W = Math.max(8, Math.round(w * scale)); H = Math.max(8, Math.round(h * scale)); N = W * H * 4;
+  orig.width = out.width = W; orig.height = out.height = H;
+  origCtx.drawImage(source, 0, 0, W, H);
+  // Layout after __heap_base: SRC | BUF0 | BUF1 | TMP (TMP also holds sort spans / ASCII cells)
+  const base = (wasm.__heap_base.value + 15) & ~15;
+  const need = base + N * 4 + 65536;
+  if (need > mem.buffer.byteLength) mem.grow(Math.ceil((need - mem.buffer.byteLength) / 65536));
+  SRC = base; BUF = [base + N, base + 2 * N]; TMP = base + 3 * N;
+  new Uint8Array(mem.buffer, SRC, N).set(origCtx.getImageData(0, 0, W, H).data);
+  imgLabel = source.isSample ? "sample" : (source.fileName || "your photo");
+  render();
+}
+
+// ---------- Pipeline: ping-pong between two buffers ----------
+function render() {
+  if (!W) return;
+  const t0 = performance.now();
+  let cur = SRC, flip = 0, active = 0;
+  for (const L of layers) {
+    if (!L.on) { L.ms = 0; continue; }
+    const dst = BUF[flip], p = L.p, s = performance.now();
+    switch (L.fx) {
+      case "blur":   wasm.blur(cur, dst, TMP, W, H, p.r); break;
+      case "edges":  wasm.sobel(cur, dst, TMP, W, H, p.s, p.t, p.mode); break;
+      case "sort":   wasm.pixelsort(cur, dst, TMP, W, H, p.lo, p.hi, p.dir, p.rev ? 1 : 0, p.inv ? 1 : 0); break;
+      case "glitch": wasm.glitch(cur, dst, W, H, Math.round(p.shift * W / 1200), p.slices, p.scan, p.noise, p.seed); break;
+      case "ascii":  asciiLayer(cur, dst, p); break;
+    }
+    L.ms = performance.now() - s;
+    cur = dst; flip ^= 1; active++;
+  }
+  const total = performance.now() - t0;
+  octx.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, cur, N).slice(), W, H), 0, 0);
+  $("stats").innerHTML = `<b>${total.toFixed(1)} ms</b> · ${active} effect${active === 1 ? "" : "s"} · ${W}×${H} · ${imgLabel}`;
+  document.querySelectorAll("#stack .ms").forEach(el => {
+    const L = layers.find(l => l.id === +el.dataset.id);
+    el.textContent = L && L.on ? L.ms.toFixed(1) + " ms" : "off";
+  });
+  scheduleSave();
+}
+
+// ASCII: wasm averages cells, JS draws glyphs, then the drawing is rasterised
+// back into a W×H buffer so later effects in the stack can process it.
+function asciiLayer(src, dst, p) {
+  const cellW = Math.max(2, Math.floor(W / p.cols)), cellH = cellW * 2;
+  const c = Math.floor(W / cellW), r = Math.floor(H / cellH);
+  wasm.ascii_cells(src, TMP, W, H, cellW, cellH, p.con);
+  const cells = new Uint8Array(mem.buffer, TMP, c * r * 4);
+  const ramp = [...p.ramp];
+  const ch = Math.max(8, Math.round(W / c / 0.6)), cw = Math.round(ch * 0.6), rh = cw * 2;
+  textCanvas.width = c * cw; textCanvas.height = r * rh;
+  tctx.fillStyle = p.paper ? "#f4efe6" : "#0d0a0a"; tctx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+  tctx.font = `${ch}px "IBM Plex Mono", ui-monospace, Menlo, monospace`; tctx.textBaseline = "top";
+  const lines = [];
+  for (let y = 0; y < r; y++) {
+    let line = "";
+    for (let x = 0; x < c; x++) {
+      const i = (y * c + x) * 4, t = p.paper ? 1 - cells[i + 3] / 255 : cells[i + 3] / 255;
+      const chr = ramp[Math.min(ramp.length - 1, Math.floor(t * ramp.length))];
+      line += chr;
+      if (chr === " ") continue;
+      tctx.fillStyle = p.color ? `rgb(${cells[i]},${cells[i + 1]},${cells[i + 2]})` : (p.paper ? "#1b1614" : "#ece4dc");
+      tctx.fillText(chr, x * cw, y * rh);
+    }
+    lines.push(line.replace(/\s+$/, ""));
+  }
+  asciiText = lines.join("\n");
+  octx.imageSmoothingQuality = "high";
+  octx.drawImage(textCanvas, 0, 0, W, H);
+  new Uint8Array(mem.buffer, dst, N).set(octx.getImageData(0, 0, W, H).data);
+}
+
+// Invisible <img> over the canvas so right-click / long-press "Save image" works.
+let saveTimer, saveURL;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => out.toBlob(b => {
+    if (!b) return;
+    if (saveURL) URL.revokeObjectURL(saveURL);
+    saveURL = URL.createObjectURL(b); saveImg.src = saveURL;
+  }, "image/png"), 350);
+}
+
+let raf = 0;
+function queue() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+
+// ---------- Stack UI ----------
+function renderStack() {
+  const ol = $("stack");
+  ol.innerHTML = "";
+  layers.forEach((L, i) => {
+    const li = document.createElement("li");
+    li.className = "layer" + (L.on ? "" : " off");
+    li.setAttribute("aria-current", L.id === selected);
+    li.innerHTML = `
+      <button class="pick" type="button" aria-label="Edit ${FX[L.fx].name}, step ${i + 1}">${ICONS[L.fx]}
+        <span class="txt">${FX[L.fx].name}<small>${FX[L.fx].summary(L.p)}</small></span></button>
+      <span class="tools">
+        <span class="ms" data-id="${L.id}">${L.on ? L.ms.toFixed(1) + " ms" : "off"}</span>
+        <button class="ib" data-act="toggle" type="button" aria-label="${L.on ? "Turn off" : "Turn on"} ${FX[L.fx].name}" aria-pressed="${L.on}">${L.on ? SVG.eye : SVG.eyeOff}</button>
+        <button class="ib" data-act="up" type="button" aria-label="Move up" ${i === 0 ? "disabled" : ""}>${SVG.up}</button>
+        <button class="ib" data-act="down" type="button" aria-label="Move down" ${i === layers.length - 1 ? "disabled" : ""}>${SVG.down}</button>
+        <button class="ib" data-act="del" type="button" aria-label="Remove ${FX[L.fx].name}">${SVG.del}</button>
+      </span>`;
+    li.querySelector(".pick").addEventListener("click", () => { selected = L.id; renderStack(); showPanel(); });
+    li.querySelectorAll(".ib").forEach(b => b.addEventListener("click", () => layerAction(L, b.dataset.act)));
+    ol.appendChild(li);
+  });
+  $("stackEmpty").hidden = layers.length > 0;
+  document.querySelectorAll(".tray").forEach(b => b.disabled = layers.length >= MAX_LAYERS);
+}
+
+function layerAction(L, act) {
+  const i = layers.indexOf(L);
+  if (act === "toggle") L.on = !L.on;
+  else if (act === "up" && i > 0) [layers[i - 1], layers[i]] = [layers[i], layers[i - 1]];
+  else if (act === "down" && i < layers.length - 1) [layers[i + 1], layers[i]] = [layers[i], layers[i + 1]];
+  else if (act === "del") {
+    layers.splice(i, 1);
+    if (selected === L.id) selected = (layers[i] || layers[i - 1] || {}).id;
+    showPanel();
+  }
+  renderStack(); updateLive(); render();
+  // keep keyboard focus on the same control after re-rendering
+  const li = [...$("stack").children][layers.indexOf(L)];
+  const again = li && li.querySelector(`[data-act="${act}"]:not(:disabled)`);
+  if (again) again.focus();
+}
+
+// Load the selected layer's params into its panel's controls.
+function showPanel() {
+  const L = sel();
+  document.querySelectorAll("[data-panel]").forEach(s => s.hidden = !L || s.dataset.panel !== L.fx);
+  $("editing").hidden = !L;
+  if (!L) return;
+  const n = layers.filter(x => x.fx === L.fx).length > 1 ? ` #${layers.filter(x => x.fx === L.fx).indexOf(L) + 1}` : "";
+  $("editName").textContent = FX[L.fx].name + n;
+  for (const [id, key] of Object.entries(CTRL[L.fx])) {
+    const el = $(id), v = L.p[key];
+    if (el.classList.contains("seg")) el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.v === v));
+    else if (el.type === "checkbox") el.checked = v;
+    else el.value = v;
+    const o = $(id + "o"); if (o) o.textContent = el.value;
+  }
+}
+
+function setParam(id, value) {
+  const L = sel(); if (!L) return;
+  const key = CTRL[L.fx][id]; if (!key) return;
+  L.p[key] = value;
+  const small = $("stack").querySelector(`[aria-current="true"] small`);
+  if (small) small.textContent = FX[L.fx].summary(L.p);
+  if (key === "live") updateLive();
+  queue();
+}
+
+function bindControls() {
+  document.querySelectorAll(".panel input[type=range]").forEach(el => el.addEventListener("input", () => {
+    const o = $(el.id + "o"); if (o) o.textContent = el.value;
+    setParam(el.id, +el.value);
+  }));
+  document.querySelectorAll(".panel input[type=checkbox]").forEach(el => el.addEventListener("change", () => setParam(el.id, el.checked)));
+  $("asciiRamp").addEventListener("change", e => setParam("asciiRamp", e.target.value));
+  document.querySelectorAll(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    seg.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
+    setParam(seg.id, +b.dataset.v);
+  })));
+
+  document.querySelectorAll(".tray").forEach(b => b.addEventListener("click", () => {
+    if (layers.length >= MAX_LAYERS) return;
+    const L = makeLayer(b.dataset.fx);
+    layers.push(L); selected = L.id;
+    renderStack(); showPanel(); render();
+  }));
+  $("reroll").addEventListener("click", () => { const L = sel(); if (L && L.fx === "glitch") { L.p.seed = newSeed(); render(); } });
+
+  $("copyAscii").addEventListener("click", () => {
+    const done = msg => { $("toast").textContent = msg; setTimeout(() => $("toast").textContent = "", 2200); };
+    const fallback = () => {
+      const ta = document.createElement("textarea"); ta.value = asciiText; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done("Copied"); } catch (e) { done("Select and copy manually"); }
+      ta.remove();
+    };
+    try { navigator.clipboard.writeText(asciiText).then(() => done(`Copied ${asciiText.split("\n").length} lines`), fallback); }
+    catch (e) { fallback(); }
+  });
+
+  // Compare: hold to show the original
+  const cmp = $("compare"), show = on => { orig.hidden = !on; };
+  cmp.addEventListener("pointerdown", e => { e.preventDefault(); show(true); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => cmp.addEventListener(ev, () => show(false)));
+  cmp.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); show(true); } });
+  cmp.addEventListener("keyup", () => show(false));
+
+  // Input: file, drop, paste
+  $("file").addEventListener("change", e => e.target.files[0] && readFile(e.target.files[0]));
+  const stage = $("stage");
+  stage.addEventListener("dragover", e => { e.preventDefault(); stage.classList.add("drag"); });
+  stage.addEventListener("dragleave", () => stage.classList.remove("drag"));
+  stage.addEventListener("drop", e => {
+    e.preventDefault(); stage.classList.remove("drag");
+    const f = [...e.dataTransfer.files].find(f => f.type.startsWith("image/")); if (f) readFile(f);
+  });
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => e.preventDefault());
+  window.addEventListener("paste", e => {
+    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+    if (item) readFile(item.getAsFile());
+  });
+}
+
+// Any glitch layer with "Live signal" rerolls its tears ~9 times a second.
+let liveTimer = 0;
+function updateLive() {
+  const live = layers.filter(l => l.on && l.fx === "glitch" && l.p.live);
+  if (live.length && !liveTimer) liveTimer = setInterval(() => {
+    const now = layers.filter(l => l.on && l.fx === "glitch" && l.p.live);
+    if (!now.length) { clearInterval(liveTimer); liveTimer = 0; return; }
+    now.forEach(l => l.p.seed = newSeed()); render();
+  }, 110);
+  if (!live.length && liveTimer) { clearInterval(liveTimer); liveTimer = 0; }
+}
+
+function readFile(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => { img.fileName = file.name; loadImage(img); URL.revokeObjectURL(url); };
+  img.onerror = () => { $("stats").textContent = "That file couldn't be decoded as an image. Try a JPEG, PNG or WebP."; };
+  img.src = url;
+}
+
+// Generated sample: a banded sunset over water, rich in gradients for sorting.
+function sampleScene() {
+  const c = document.createElement("canvas"); c.width = 1200; c.height = 800;
+  const g = c.getContext("2d");
+  const sky = g.createLinearGradient(0, 0, 0, 470);
+  [[0, "#1d1446"], [.35, "#6b2a6e"], [.62, "#e2533b"], [.85, "#f6a03a"], [1, "#ffd27a"]].forEach(([s, col]) => sky.addColorStop(s, col));
+  g.fillStyle = sky; g.fillRect(0, 0, 1200, 470);
+  for (let i = 0; i < 160; i++) { g.fillStyle = `rgba(255,255,255,${Math.random() * .7})`; g.fillRect(Math.random() * 1200, Math.random() * 180, 2, 2); }
+  const sun = g.createRadialGradient(720, 400, 10, 720, 400, 150);
+  sun.addColorStop(0, "#fff6d0"); sun.addColorStop(.55, "#ffcf5a"); sun.addColorStop(1, "rgba(255,140,60,0)");
+  g.fillStyle = sun; g.beginPath(); g.arc(720, 400, 150, 0, Math.PI * 2); g.fill();
+  const ridges = [["#5a2453", 330, 70, .006], ["#3a1840", 380, 55, .011], ["#1f0f27", 430, 40, .019]];
+  ridges.forEach(([col, base, amp, f], k) => {
+    g.fillStyle = col; g.beginPath(); g.moveTo(0, 470);
+    for (let x = 0; x <= 1200; x += 6) g.lineTo(x, base - amp * (Math.sin(x * f + k) * .6 + Math.sin(x * f * 2.7 + k * 3) * .4));
+    g.lineTo(1200, 470); g.fill();
+  });
+  const sea = g.createLinearGradient(0, 470, 0, 800);
+  sea.addColorStop(0, "#3a2050"); sea.addColorStop(1, "#0b0a1c");
+  g.fillStyle = sea; g.fillRect(0, 470, 1200, 330);
+  for (let y = 474; y < 800; y += 5) {
+    const t = (y - 470) / 330, half = 40 + t * 260 + Math.sin(y * .7) * 30;
+    g.fillStyle = `rgba(255,${190 - t * 90},${90 - t * 40},${.85 - t * .6})`;
+    for (let s = 0; s < 3; s++) {
+      const off = (Math.sin(y * 1.3 + s * 2) * .5) * half;
+      g.fillRect(720 + off - half * (.25 + Math.random() * .25), y, half * (.3 + Math.random() * .4), 2);
+    }
+  }
+  g.fillStyle = "#120a16"; g.beginPath(); g.moveTo(140, 800); g.lineTo(250, 640); g.lineTo(310, 640); g.lineTo(300, 800); g.fill();
+  g.fillRect(262, 560, 6, 82); g.beginPath(); g.moveTo(268, 562); g.lineTo(330, 630); g.lineTo(268, 630); g.fill();
+  c.isSample = true;
+  return c;
+}
+
+boot().catch(err => { $("engine").textContent = "WebAssembly failed to start: " + err.message; });
+</script>
