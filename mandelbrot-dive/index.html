@@ -1,0 +1,410 @@
+<title>Mandelbrot Dive</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,750&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the fractal is the whole screen; a thin instrument strip floats top and a control rail floats bottom. Single committed dark look. */
+:root {
+  --ink: #07080c;
+  --glass: rgba(12, 14, 22, 0.72);
+  --line: rgba(196, 206, 240, 0.16);
+  --fg: #e9ecf6;
+  --muted: #8d94ab;
+  --accent: #ffb547;
+  --warn: #ff7a6b;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--ink); color: var(--fg);
+  font: 13px/1.4 var(--mono);
+  overflow: hidden; overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+}
+#c {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  touch-action: none; cursor: grab; display: block;
+}
+#c.drag { cursor: grabbing; }
+
+.hud {
+  position: fixed; left: 0; right: 0; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start;
+}
+.hud > * { pointer-events: auto; }
+.top { top: 0; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); justify-content: space-between; }
+.bottom { bottom: 0; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+
+.panel {
+  background: var(--glass); border: 1px solid var(--line); border-radius: 10px;
+  -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3);
+}
+.brand { padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.brand h1 {
+  margin: 0; font: 750 20px/1 var(--display); letter-spacing: -0.02em;
+  font-variation-settings: "opsz" 96;
+}
+.brand h1 span { color: var(--accent); }
+.brand small { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; }
+
+.readout {
+  padding: 8px 12px; display: grid; grid-template-columns: auto auto; gap: 1px 12px;
+  font-variant-numeric: tabular-nums; font-size: 11.5px; min-width: 0;
+}
+.readout dt { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; align-self: center; }
+.readout dd { margin: 0; text-align: right; white-space: nowrap; }
+.readout dd.hot { color: var(--accent); }
+.floor { color: var(--warn) !important; }
+
+.rail { padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; max-width: 760px; margin-inline: auto; }
+.group { display: flex; gap: 4px; align-items: center; }
+.label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; margin-right: 2px; }
+.sep { width: 1px; align-self: stretch; background: var(--line); }
+
+button, select {
+  font: 600 12px/1 var(--mono); color: var(--fg);
+  background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 7px;
+  height: 32px; padding: 0 10px; cursor: pointer;
+}
+button:hover, select:hover { border-color: rgba(255,181,71,0.5); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+select { padding-right: 6px; max-width: 150px; }
+select option { background: #151824; }
+
+.swatch { width: 32px; padding: 0; border-radius: 7px; position: relative; }
+.swatch i { position: absolute; inset: 4px; border-radius: 4px; display: block; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--accent); }
+#iters { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.grow { flex: 1; }
+
+.hint {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  pointer-events: none; padding: 10px 14px; color: var(--fg); font-size: 12px; text-align: center;
+  transition: opacity 0.6s ease;
+}
+.hint.gone { opacity: 0; }
+@media (max-width: 560px) {
+  .readout { font-size: 10.5px; }
+  .brand small { display: none; }
+  .hide-sm { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
+</style>
+
+<canvas id="c" aria-label="Mandelbrot set. Drag to pan, scroll or pinch to zoom, double-tap to dive in."></canvas>
+
+<div class="hud top">
+  <div class="panel brand">
+    <h1>Mandelbrot <span>Dive</span></h1>
+    <small>z ↦ z² + c · WebAssembly core</small>
+  </div>
+  <dl class="panel readout" id="readout">
+    <dt>Re</dt><dd id="re">−0.5</dd>
+    <dt>Im</dt><dd id="im">0</dd>
+    <dt>Zoom</dt><dd id="zoom" class="hot">×1</dd>
+    <dt>Frame</dt><dd id="ms">–</dd>
+  </dl>
+</div>
+
+<div class="hud bottom">
+  <div class="panel rail">
+    <div class="group" id="swatches" role="group" aria-label="Palette"></div>
+    <span class="sep"></span>
+    <div class="group">
+      <span class="label">Iter</span>
+      <button id="less" aria-label="Fewer iterations">−</button>
+      <span id="iters">256</span>
+      <button id="more" aria-label="More iterations">+</button>
+    </div>
+    <span class="sep hide-sm"></span>
+    <button id="cycle" aria-pressed="false" title="Animate the palette">Cycle</button>
+    <div class="grow"></div>
+    <select id="places" aria-label="Fly to a landmark">
+      <option value="">Fly to…</option>
+    </select>
+    <button id="reset" title="Back to the whole set">Reset</button>
+  </div>
+</div>
+
+<div class="panel hint" id="hint">Drag to pan · pinch or scroll to zoom · double-tap to dive</div>
+
+<script>
+const WASM_B64 = "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";
+
+// ---------- palettes (cosine gradients, Inigo Quilez style) ----------
+const PALETTES = [
+  { name: "Ember",    a:[.5,.5,.5],  b:[.5,.5,.5],  c:[1,1,1],     d:[0,.10,.20] },
+  { name: "Tidepool", a:[.5,.5,.5],  b:[.5,.5,.5],  c:[1,1,1],     d:[.30,.20,.20] },
+  { name: "Lichen",   a:[.5,.5,.5],  b:[.5,.5,.5],  c:[1,1,.5],    d:[.80,.90,.30] },
+  { name: "Aurora",   a:[.5,.5,.5],  b:[.5,.5,.5],  c:[2,1,0],     d:[.50,.20,.25] },
+  { name: "Bone",     a:[.6,.55,.5], b:[.4,.4,.42], c:[1,1,1],     d:[0,0,0] },
+];
+function cosCol(p, t) {
+  return [0,1,2].map(k => Math.max(0, Math.min(1, p.a[k] + p.b[k]*Math.cos(6.28318*(p.c[k]*t + p.d[k])))));
+}
+
+// ---------- landmarks: centre and visible width in the complex plane ----------
+const PLACES = [
+  { name: "Seahorse Valley", re: -0.7453,  im: 0.1127,   w: 0.012 },
+  { name: "Elephant Valley", re: 0.2756,   im: 0.0062,   w: 0.018 },
+  { name: "Double spiral",   re: -0.761574, im: -0.0847596, w: 0.00035 },
+  { name: "Mini-brot",       re: -1.7548776662466927, im: 0, w: 0.06 },
+  { name: "Tendril tip",     re: -0.10109636384562, im: 0.95628651080914, w: 0.0008 },
+  { name: "Deep dive (f64 edge)", re: -0.743643887037151, im: 0.131825904205330, w: 6e-11 },
+];
+
+const HOME = { re: -0.6, im: 0, w: 3.4 };
+
+(async function main() {
+  const bytes = Uint8Array.from(atob(WASM_B64), ch => ch.charCodeAt(0));
+  const { instance } = await WebAssembly.instantiate(bytes);
+  const X = instance.exports, mem = X.memory;
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d", { alpha: false });
+  const $ = id => document.getElementById(id);
+
+  // View: centre (cx, cy) and complex units per canvas pixel.
+  let W = 0, H = 0, nuPtr = 0, pxPtr = 0, img = null;
+  let cx = HOME.re, cy = HOME.im, scale = 0, baseScale = 1;
+  let iterBias = 0;          // user nudge on top of the automatic iteration count
+  let palIdx = 0, density = 1/40, offset = 0, cycling = false;
+
+  // ---------- memory & canvas sizing ----------
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, matchMedia("(pointer: coarse)").matches ? 1.5 : 2);
+    const nw = Math.max(1, Math.round(innerWidth * dpr)), nh = Math.max(1, Math.round(innerHeight * dpr));
+    const keepWidth = scale ? scale * W : HOME.w;      // keep the same complex width across resizes
+    W = nw; H = nh; canvas.width = W; canvas.height = H;
+    const heap = X.heap_ptr();
+    nuPtr = (heap + 15) & ~15;
+    pxPtr = nuPtr + W * H * 4;
+    const need = pxPtr + W * H * 4;
+    if (need > mem.buffer.byteLength) mem.grow(Math.ceil((need - mem.buffer.byteLength) / 65536));
+    img = new ImageData(new Uint8ClampedArray(mem.buffer, pxPtr, W * H * 4), W, H);
+    baseScale = HOME.w / Math.min(W, H * 1.4);
+    scale = keepWidth / W;
+    if (!isFinite(scale) || scale <= 0) scale = baseScale;
+    requestRender();
+  }
+
+  // ---------- palette upload ----------
+  const swatchBox = $("swatches");
+  PALETTES.forEach((p, i) => {
+    const b = document.createElement("button");
+    b.className = "swatch"; b.title = p.name; b.setAttribute("aria-label", p.name + " palette");
+    const stops = [0, .2, .4, .6, .8, 1].map(t => { const c = cosCol(p, t).map(v => Math.round(v*255)); return `rgb(${c})`; });
+    b.innerHTML = `<i style="background:linear-gradient(90deg,${stops.join(",")})"></i>`;
+    b.onclick = () => setPalette(i);
+    swatchBox.appendChild(b);
+  });
+  function setPalette(i) {
+    palIdx = i;
+    const pal = new Uint32Array(mem.buffer, X.palette_ptr(), 1024);
+    const p = PALETTES[i];
+    for (let k = 0; k < 1024; k++) {
+      const [r, g, b] = cosCol(p, k / 1024);
+      pal[k] = (0xff << 24) | (Math.round(b*255) << 16) | (Math.round(g*255) << 8) | Math.round(r*255);
+    }
+    [...swatchBox.children].forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+    recolor();
+  }
+
+  // ---------- rendering: fast preview, then refine in time-sliced row bands ----------
+  const zoomLevel = () => baseScale / scale;
+  const maxIter = () => {
+    const auto = 220 + 110 * Math.max(0, Math.log2(zoomLevel()));
+    return Math.max(32, Math.round(auto * Math.pow(2, iterBias)));
+  };
+  let job = null, dirty = false, frameStart = 0, iterSum = 0;
+
+  function requestRender() { dirty = true; }
+  function recolor() {
+    if (!img) return;
+    if (img.data.buffer !== mem.buffer) img = new ImageData(new Uint8ClampedArray(mem.buffer, pxPtr, W*H*4), W, H);
+    X.colorize(nuPtr, pxPtr, W * H, density, offset);
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function tick(now) {
+    if (dirty) {
+      dirty = false;
+      const it = maxIter();
+      frameStart = performance.now();
+      // Coarse preview: 1 sample per 6x6 block, keeps pan/pinch at 60fps.
+      iterSum = X.render(nuPtr, W, H, 0, H, cx, cy, scale, it, 6);
+      job = { y: 0, it, band: 24 };
+      recolor();
+      updateHud();
+    } else if (job) {
+      const t0 = performance.now();
+      while (job.y < H && performance.now() - t0 < 12) {
+        const y1 = Math.min(H, job.y + job.band);
+        const ts = performance.now();
+        iterSum += X.render(nuPtr, W, H, job.y, y1, cx, cy, scale, job.it, 1);
+        const dt = performance.now() - ts;
+        job.y = y1;
+        job.band = Math.max(4, Math.min(256, Math.round(job.band * (dt < 3 ? 1.6 : dt > 8 ? 0.6 : 1))));
+      }
+      recolor();
+      if (job.y >= H) {
+        const ms = performance.now() - frameStart;
+        $("ms").textContent = `${ms < 1000 ? ms.toFixed(0) + " ms" : (ms/1000).toFixed(1) + " s"} · ${(iterSum/1e6).toFixed(0)}M it`;
+        job = null;
+      }
+    } else if (cycling) {
+      offset = (offset + 0.0025) % 1;
+      recolor();
+    }
+    if (cycling && job) offset = (offset + 0.0025) % 1;
+    if (anim) stepAnim(now);
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- HUD ----------
+  function fmtCoord(v) {
+    const digits = Math.min(16, Math.max(4, Math.ceil(-Math.log10(scale * 10))));
+    return (v < 0 ? "−" : "") + Math.abs(v).toFixed(digits);
+  }
+  function fmtZoom(z) {
+    if (z < 1e4) return "×" + (z < 10 ? z.toFixed(1) : Math.round(z).toLocaleString());
+    const e = Math.floor(Math.log10(z)), m = z / Math.pow(10, e);
+    return `×${m.toFixed(1)}e${e}`;
+  }
+  function updateHud() {
+    $("re").textContent = fmtCoord(cx);
+    $("im").textContent = fmtCoord(cy);
+    const z = $("zoom");
+    z.textContent = fmtZoom(zoomLevel());
+    // Below ~1e-15 per pixel, neighbouring pixels share the same double: the image goes blocky.
+    const atFloor = scale < 2.5e-16 * Math.max(1, Math.abs(cx), Math.abs(cy)) * 8;
+    z.classList.toggle("floor", atFloor);
+    z.title = atFloor ? "Past the precision of 64-bit floats; pixels start to merge." : "";
+    $("iters").textContent = maxIter().toLocaleString();
+    $("ms").textContent = "…";
+  }
+
+  // ---------- coordinate helpers ----------
+  const toCanvas = (ex, ey) => { const r = canvas.getBoundingClientRect(); return [(ex - r.left) * W / r.width, (ey - r.top) * H / r.height]; };
+  const toComplex = (px, py) => [cx + (px - W/2) * scale, cy - (py - H/2) * scale];
+  function zoomAt(px, py, factor) {
+    const [re, im] = toComplex(px, py);
+    scale = Math.min(baseScale * 4, scale / factor);
+    cx = re - (px - W/2) * scale; cy = im + (py - H/2) * scale;
+    requestRender();
+  }
+
+  // ---------- animated flights ----------
+  let anim = null;
+  function flyTo(re, im, sc, ms = 900) {
+    anim = { t0: performance.now(), ms, from: [cx, cy, Math.log(scale)], to: [re, im, Math.log(sc)] };
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) anim.ms = 1;
+  }
+  function stepAnim(now) {
+    let t = Math.min(1, (now - anim.t0) / anim.ms);
+    const e = t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    const [a, b] = [anim.from, anim.to];
+    const ls = a[2] + (b[2] - a[2]) * e;
+    // Move the centre in screen space so the target stays steady while zooming.
+    const k = (Math.exp(ls) - Math.exp(a[2])) / ((Math.exp(b[2]) - Math.exp(a[2])) || 1);
+    const m = Math.abs(b[2] - a[2]) < 1e-9 ? e : Math.max(0, Math.min(1, k));
+    cx = a[0] + (b[0] - a[0]) * m; cy = a[1] + (b[1] - a[1]) * m;
+    scale = Math.exp(ls);
+    requestRender();
+    if (t >= 1) anim = null;
+  }
+
+  // ---------- input: drag, pinch, wheel, double-tap ----------
+  const pts = new Map();
+  let lastTap = 0, pinch = null;
+  function hideHint() { $("hint").classList.add("gone"); }
+
+  canvas.addEventListener("pointerdown", e => {
+    canvas.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId, toCanvas(e.clientX, e.clientY));
+    canvas.classList.add("drag"); anim = null; hideHint();
+    if (pts.size === 2) {
+      const [p, q] = [...pts.values()];
+      pinch = { d: Math.hypot(p[0]-q[0], p[1]-q[1]), mid: [(p[0]+q[0])/2, (p[1]+q[1])/2] };
+    }
+    const now = performance.now();
+    if (pts.size === 1 && now - lastTap < 300) {
+      const [px, py] = pts.get(e.pointerId);
+      const [re, im] = toComplex(px, py);
+      flyTo(re, im, scale / 4, 500);
+      lastTap = 0;
+    } else lastTap = now;
+  });
+  canvas.addEventListener("pointermove", e => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId), cur = toCanvas(e.clientX, e.clientY);
+    pts.set(e.pointerId, cur);
+    if (pts.size === 1) {
+      cx -= (cur[0] - prev[0]) * scale; cy += (cur[1] - prev[1]) * scale;
+      if (Math.hypot(cur[0]-prev[0], cur[1]-prev[1]) > 3) lastTap = 0;
+      requestRender();
+    } else if (pts.size === 2 && pinch) {
+      const [p, q] = [...pts.values()];
+      const d = Math.hypot(p[0]-q[0], p[1]-q[1]);
+      const mid = [(p[0]+q[0])/2, (p[1]+q[1])/2];
+      cx -= (mid[0] - pinch.mid[0]) * scale; cy += (mid[1] - pinch.mid[1]) * scale;
+      zoomAt(mid[0], mid[1], d / (pinch.d || d));
+      pinch = { d, mid }; lastTap = 0;
+    }
+  });
+  const up = e => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (!pts.size) canvas.classList.remove("drag");
+  };
+  canvas.addEventListener("pointerup", up);
+  canvas.addEventListener("pointercancel", up);
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault(); anim = null; hideHint();
+    const [px, py] = toCanvas(e.clientX, e.clientY);
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoomAt(px, py, Math.pow(1.0018, -dy));
+  }, { passive: false });
+
+  addEventListener("keydown", e => {
+    if (e.target.tagName === "SELECT") return;
+    const step = 60 * scale;
+    const k = e.key;
+    if (k === "+" || k === "=") zoomAt(W/2, H/2, 1.5);
+    else if (k === "-" || k === "_") zoomAt(W/2, H/2, 1/1.5);
+    else if (k === "ArrowLeft") { cx -= step; requestRender(); }
+    else if (k === "ArrowRight") { cx += step; requestRender(); }
+    else if (k === "ArrowUp") { cy += step; requestRender(); }
+    else if (k === "ArrowDown") { cy -= step; requestRender(); }
+    else return;
+    e.preventDefault(); hideHint();
+  });
+
+  // ---------- controls ----------
+  $("more").onclick = () => { iterBias = Math.min(4, iterBias + 0.5); requestRender(); };
+  $("less").onclick = () => { iterBias = Math.max(-3, iterBias - 0.5); requestRender(); };
+  $("cycle").onclick = e => { cycling = !cycling; e.currentTarget.setAttribute("aria-pressed", String(cycling)); };
+  $("reset").onclick = () => { hideHint(); iterBias = 0; flyTo(HOME.re, HOME.im, baseScale, 900); };
+  const sel = $("places");
+  PLACES.forEach((p, i) => { const o = document.createElement("option"); o.value = i; o.textContent = p.name; sel.appendChild(o); });
+  sel.onchange = () => {
+    const p = PLACES[+sel.value]; sel.value = ""; if (!p) return;
+    hideHint();
+    flyTo(p.re, p.im, p.w / Math.min(W, H * 1.4), 1400);
+  };
+
+  addEventListener("resize", resize);
+  resize();
+  scale = baseScale;
+  setPalette(0);
+  requestAnimationFrame(tick);
+  setTimeout(hideHint, 4500);
+})().catch(err => {
+  document.getElementById("hint").textContent = "This browser couldn't start WebAssembly: " + err.message;
+});
+</script>
