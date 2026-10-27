@@ -18,6 +18,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Mandelbrot Dive | `/mandelbrot-dive/` | private repo `alxpark/mandelbrot-dive` (`./build.sh` → `docs/index.html`) |
 | WASM Pedalboard | `/wasm-pedalboard/` | private repo `alxpark/wasm-pedalboard` (`./build.sh` → `index.html`) |
 | Swarm & Spiral | `/swarm-and-spiral/` | repo `alxpark/swarm-and-spiral` (`./build.sh` → `index.html`) |
+| Kiln Sandbox | `/kiln-sandbox/` | private repo `alxpark/kiln-sandbox` (`./build.sh` → `build/index.html`) |
 
 ## Adding an app
 
