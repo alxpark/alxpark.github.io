@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Play Connect Four against a C++ alpha-beta search engine compiled to WebAssembly.">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Four Deep</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Familjen+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: board is the hero; engine telemetry sits beside it on wide screens, beneath it on phones. */
+:root {
+  --bg: #e9eef0;
+  --surface: #f7fafa;
+  --ink: #14262c;
+  --muted: #5b6f75;
+  --line: #c9d5d8;
+  --frame: #135668;
+  --frame-hi: #1b6d82;
+  --hole: #dfe8ea;
+  --you: #e9a420;
+  --you-rim: #b97c0c;
+  --eng: #cf4a35;
+  --eng-rim: #9c3121;
+  --good: #1e8a5a;
+  --bad: #c0392b;
+  --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1a1e; --surface: #13252a; --ink: #e2ecee; --muted: #8fa5aa; --line: #24414a;
+    --frame: #145a6d; --frame-hi: #1c7389; --hole: #0a1518;
+    --you: #f0b232; --you-rim: #b98010; --eng: #e05a43; --eng-rim: #a63724;
+    --good: #3cbf84; --bad: #ef6a5a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1a1e; --surface: #13252a; --ink: #e2ecee; --muted: #8fa5aa; --line: #24414a;
+  --frame: #145a6d; --frame-hi: #1c7389; --hole: #0a1518;
+  --you: #f0b232; --you-rim: #b98010; --eng: #e05a43; --eng-rim: #a63724;
+  --good: #3cbf84; --bad: #ef6a5a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+h1 {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(34px, 7vw, 52px);
+  letter-spacing: .01em; line-height: .95; margin: 0; text-transform: uppercase;
+}
+h1 span { color: var(--frame-hi); }
+.tagline { margin: 0; color: var(--muted); max-width: 46ch; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+@media (max-width: 760px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- board ---------- */
+.board-zone { display: grid; gap: 10px; justify-items: center; min-width: 0; }
+.status {
+  min-height: 2.4em; text-align: center; font-weight: 600; font-size: 17px;
+  display: flex; align-items: center; gap: 10px; justify-content: center; flex-wrap: wrap;
+}
+.chip { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: inset 0 -2px 0 rgba(0,0,0,.25); }
+.chip.you { background: var(--you); } .chip.eng { background: var(--eng); }
+.board-shell { width: 100%; max-width: 560px; }
+.board {
+  position: relative; width: 100%; aspect-ratio: 7 / 6.25; max-width: 100%;
+  background: linear-gradient(180deg, var(--frame-hi), var(--frame));
+  border-radius: 14px; padding: 2.4%;
+  box-shadow: 0 2px 0 rgba(0,0,0,.18), 0 18px 40px -18px rgba(10,40,50,.55);
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+}
+.col {
+  position: relative; display: grid; grid-template-rows: repeat(6, 1fr);
+  border: 0; background: none; padding: 0; margin: 0; cursor: pointer; border-radius: 10px;
+  font: inherit; color: inherit;
+}
+.col:disabled { cursor: default; }
+.col:focus-visible { outline: 3px solid var(--you); outline-offset: -2px; }
+.col.hint::after {
+  content: ""; position: absolute; inset: -2px 6%; border-radius: 10px;
+  border: 3px dashed var(--you); pointer-events: none;
+}
+.cell { position: relative; display: grid; place-items: center; }
+.hole {
+  width: 80%; aspect-ratio: 1; border-radius: 50%; background: var(--hole);
+  box-shadow: inset 0 3px 6px rgba(0,0,0,.35);
+  position: relative; overflow: visible;
+}
+.disc {
+  position: absolute; inset: 0; border-radius: 50%;
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), inset 0 0 0 4px rgba(255,255,255,.12);
+  transition: transform .42s cubic-bezier(.34,1.32,.64,1);
+}
+.disc.you { background: radial-gradient(circle at 38% 34%, color-mix(in srgb, var(--you) 70%, white) 0, var(--you) 45%, var(--you-rim) 100%); }
+.disc.eng { background: radial-gradient(circle at 38% 34%, color-mix(in srgb, var(--eng) 70%, white) 0, var(--eng) 45%, var(--eng-rim) 100%); }
+.disc.win { animation: pulse 1s ease-in-out infinite alternate; outline: 3px solid var(--surface); outline-offset: -3px; }
+.disc.last::after {
+  content: ""; position: absolute; inset: 38%; border-radius: 50%; background: rgba(255,255,255,.55);
+}
+@keyframes pulse { to { filter: brightness(1.25); transform: scale(1.06); } }
+.ghost { position: absolute; inset: 0; border-radius: 50%; opacity: 0; transition: opacity .12s; background: var(--you); }
+@media (hover: hover) { .col:not(:disabled):hover .cell.target .ghost { opacity: .35; } }
+.colnums { display: grid; grid-template-columns: repeat(7, 1fr); width: 100%; max-width: 560px; padding: 0 2.4%; }
+.colnums span { text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+/* ---------- controls ---------- */
+.side { display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
+.label {
+  font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  text-align: center; padding: 8px 4px; cursor: pointer; font-weight: 500; font-size: 14px;
+  border-left: 1px solid var(--line); user-select: none;
+}
+.seg label:first-of-type { border-left: 0; }
+.seg input:checked + label { background: var(--ink); color: var(--surface); }
+.seg input:focus-visible + label { outline: 2px solid var(--you); outline-offset: -3px; }
+.level-note { font-size: 13px; color: var(--muted); margin: 0; min-height: 2.6em; }
+.btns { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; }
+button.act { white-space: nowrap; }
+button.act {
+  font: inherit; font-weight: 600; font-size: 14px; padding: 9px 6px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+}
+button.act.primary { background: var(--frame); border-color: var(--frame); color: #fff; }
+button.act:disabled { opacity: .45; cursor: default; }
+button.act:focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
+
+/* ---------- telemetry ---------- */
+.tele { font-family: var(--font-mono); font-size: 13px; }
+.tele dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.tele dt { color: var(--muted); }
+.tele dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.verdict {
+  font-family: var(--font-body); font-weight: 600; font-size: 15px; padding: 9px 10px; border-radius: 8px;
+  background: var(--bg); border-left: 4px solid var(--muted);
+}
+.verdict.eng { border-left-color: var(--eng); }
+.verdict.you { border-left-color: var(--good); }
+.verdict.draw { border-left-color: var(--frame-hi); }
+.meter { height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; position: relative; }
+.meter i { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; background: var(--eng); transition: all .4s; }
+.meter::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.meter-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--font-body); }
+.thinking .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--eng); animation: blink .8s infinite alternate; }
+@keyframes blink { from { opacity: .2; } to { opacity: 1; } }
+.moves { font-family: var(--font-mono); font-size: 12px; color: var(--muted); word-break: break-all; margin: 0; }
+footer { color: var(--muted); font-size: 13px; max-width: 70ch; }
+footer p { margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .disc { transition: none; } .disc.win, .thinking .dot { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Four <span>Deep</span></h1>
+    <p class="tagline">Connect Four against a C++ alpha-beta engine compiled to WebAssembly, running in your browser.</p>
+  </header>
+
+  <div class="main">
+    <section class="board-zone" aria-label="Game board">
+      <div class="status" id="status" aria-live="polite">Loading engine…</div>
+      <div class="board-shell">
+        <div class="board" id="board"></div>
+      </div>
+      <div class="colnums" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span></div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <span class="label" id="lvl-label">Engine strength</span>
+        <div class="seg" role="radiogroup" aria-labelledby="lvl-label">
+          <input type="radio" name="level" id="lvl0" value="0"><label for="lvl0">Casual</label>
+          <input type="radio" name="level" id="lvl1" value="1"><label for="lvl1">Club</label>
+          <input type="radio" name="level" id="lvl2" value="2"><label for="lvl2">Strong</label>
+          <input type="radio" name="level" id="lvl3" value="3"><label for="lvl3">Solver</label>
+        </div>
+        <p class="level-note" id="level-note"></p>
+        <span class="label" id="first-label">Who moves first</span>
+        <div class="seg two" role="radiogroup" aria-labelledby="first-label">
+          <input type="radio" name="first" id="first-you" value="you"><label for="first-you">You</label>
+          <input type="radio" name="first" id="first-eng" value="eng"><label for="first-eng">Engine</label>
+        </div>
+        <div class="btns">
+          <button class="act primary" id="new">New game</button>
+          <button class="act" id="undo">Undo</button>
+          <button class="act" id="hint">Hint</button>
+        </div>
+      </div>
+
+      <div class="panel tele" id="tele" aria-live="polite">
+        <span class="label">Engine telemetry</span>
+        <div class="verdict" id="verdict">Waiting for the first search</div>
+        <div>
+          <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+          <div class="meter-legend"><span>you</span><span>engine</span></div>
+        </div>
+        <dl>
+          <dt>Search depth</dt><dd id="t-depth">–</dd>
+          <dt>Positions</dt><dd id="t-nodes">–</dd>
+          <dt>Speed</dt><dd id="t-speed">–</dd>
+          <dt>Time</dt><dd id="t-time">–</dd>
+          <dt>Engine move</dt><dd id="t-move">–</dd>
+        </dl>
+        <p class="moves" id="moves"></p>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    <p>The engine searches a 64-bit bitboard with negamax, alpha-beta pruning, a 4M-entry transposition table and iterative deepening. On Strong and Solver it also tries to prove the exact result with a null-window search to the end of the game; once it proves a win it will not let go. Press 1–7 to drop a disc.</p>
+  </footer>
+</div>
+
+<script>
+const WASM_B64 = "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";
+
+// ---------------------------------------------------------------- engine worker
+const workerSrc = `
+let e = null;
+onmessage = async (ev) => {
+  const m = ev.data;
+  if (m.type === 'init') {
+    const { instance } = await WebAssembly.instantiate(m.bytes, { env: { now: () => performance.now() } });
+    e = instance.exports;
+    postMessage({ type: 'ready' });
+    return;
+  }
+  if (m.type === 'search') {
+    e.c4_reset();
+    for (const c of m.moves) e.c4_play(c);
+    const t0 = performance.now();
+    const col = e.c4_search(m.depth, m.ms, m.solve ? 1 : 0);
+    postMessage({
+      type: 'result', id: m.id, col,
+      score: e.c4_last_score(), depth: e.c4_last_depth(), nodes: e.c4_last_nodes(),
+      result: e.c4_last_result(), ms: performance.now() - t0, moves: m.moves.length
+    });
+  }
+};`;
+const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })));
+const wasmBytes = Uint8Array.from(atob(WASM_B64), ch => ch.charCodeAt(0));
+let reqId = 0;
+const pending = new Map();
+worker.onmessage = (ev) => {
+  const m = ev.data;
+  if (m.type === 'ready') { engineReady = true; boot(); return; }
+  const cb = pending.get(m.id);
+  if (cb) { pending.delete(m.id); cb(m); }
+};
+function search(moves, opts) {
+  return new Promise(res => {
+    const id = ++reqId;
+    pending.set(id, res);
+    worker.postMessage({ type: 'search', id, moves: moves.slice(), ...opts });
+  });
+}
+
+// ---------------------------------------------------------------- levels
+const LEVELS = [
+  { name: 'Casual', depth: 3, ms: 0, solve: false, noise: 0.3,
+    note: 'Looks 3 moves ahead and sometimes plays a careless move.' },
+  { name: 'Club', depth: 7, ms: 0, solve: false, noise: 0,
+    note: 'Looks 7 moves ahead with no time pressure. Catches most tactics.' },
+  { name: 'Strong', depth: 64, ms: 1200, solve: true, noise: 0,
+    note: '1.2 seconds per move, then tries to prove the result exactly.' },
+  { name: 'Solver', depth: 64, ms: 3500, solve: true, noise: 0,
+    note: '3.5 seconds per move. Plays perfectly once it can see to the end, usually by move 10.' },
+];
+
+// ---------------------------------------------------------------- game state
+const W = 7, H = 6;
+let moves = [];
+let level = 2;
+let humanFirst = true;
+let busy = false, over = null, engineReady = false;
+let hintCol = -1;
+let lastStats = null;
+
+function loadPrefs() {
+  try {
+    const s = JSON.parse(localStorage.getItem('fourdeep') || '{}');
+    if (Number.isInteger(s.level) && s.level >= 0 && s.level < 4) level = s.level;
+    if (typeof s.humanFirst === 'boolean') humanFirst = s.humanFirst;
+  } catch (_) {}
+}
+function savePrefs() {
+  try { localStorage.setItem('fourdeep', JSON.stringify({ level, humanFirst })); } catch (_) {}
+}
+
+function boardFrom(ms) {
+  const b = Array.from({ length: W }, () => []);
+  ms.forEach((c, i) => b[c].push(i % 2));  // 0 = first player, 1 = second
+  return b;
+}
+const youIdx = () => humanFirst ? 0 : 1;
+const sideToMove = () => moves.length % 2;
+const humanToMove = () => sideToMove() === youIdx();
+
+function findWin(b, c) {
+  const r = b[c].length - 1, p = b[c][r];
+  const at = (x, y) => (x >= 0 && x < W && y >= 0 && y < b[x].length) ? b[x][y] : -1;
+  for (const [dx, dy] of [[1,0],[0,1],[1,1],[1,-1]]) {
+    const cells = [[c, r]];
+    for (const s of [1, -1])
+      for (let k = 1; k < 4 && at(c + s*k*dx, r + s*k*dy) === p; k++) cells.push([c + s*k*dx, r + s*k*dy]);
+    if (cells.length >= 4) return cells;
+  }
+  return null;
+}
+function outcome(ms) {
+  if (!ms.length) return null;
+  const b = boardFrom(ms);
+  const w = findWin(b, ms[ms.length - 1]);
+  if (w) return { winner: (ms.length - 1) % 2, cells: w };
+  if (ms.length === W * H) return { winner: -1, cells: [] };
+  return null;
+}
+
+// ---------------------------------------------------------------- rendering
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const cols = [];
+for (let c = 0; c < W; c++) {
+  const btn = document.createElement('button');
+  btn.className = 'col'; btn.dataset.col = c;
+  for (let r = H - 1; r >= 0; r--) {
+    const cell = document.createElement('div');
+    cell.className = 'cell'; cell.dataset.row = r;
+    const hole = document.createElement('div'); hole.className = 'hole';
+    const ghost = document.createElement('div'); ghost.className = 'ghost';
+    hole.appendChild(ghost);
+    cell.appendChild(hole);
+    btn.appendChild(cell);
+  }
+  btn.addEventListener('click', () => humanPlay(c));
+  boardEl.appendChild(btn);
+  cols.push(btn);
+}
+const holeAt = (c, r) => cols[c].querySelector(`.cell[data-row="${r}"] .hole`);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function render(animateLast = false) {
+  const b = boardFrom(moves);
+  const yi = youIdx();
+  boardEl.querySelectorAll('.disc').forEach(d => d.remove());
+  for (let c = 0; c < W; c++) {
+    cols[c].querySelectorAll('.cell').forEach(el => el.classList.remove('target'));
+    if (b[c].length < H) cols[c].querySelector(`.cell[data-row="${b[c].length}"]`).classList.add('target');
+    for (let r = 0; r < b[c].length; r++) {
+      const d = document.createElement('div');
+      d.className = 'disc ' + (b[c][r] === yi ? 'you' : 'eng');
+      holeAt(c, r).appendChild(d);
+    }
+  }
+  if (moves.length) {
+    const lc = moves[moves.length - 1], lr = b[lc].length - 1;
+    const d = holeAt(lc, lr).querySelector('.disc');
+    d.classList.add('last');
+    if (animateLast && !reduceMotion) {
+      const drop = (H - lr) * 125;  // % of disc height to the top of the board
+      d.style.transition = 'none';
+      d.style.transform = `translateY(-${drop}%)`;
+      d.getBoundingClientRect();
+      d.style.transition = '';
+      d.style.transform = '';
+    }
+  }
+  if (over) for (const [c, r] of over.cells) holeAt(c, r).querySelector('.disc').classList.add('win');
+  document.querySelectorAll('.ghost').forEach(g => g.style.background = 'var(--you)');
+
+  const playable = engineReady && !busy && !over && humanToMove();
+  cols.forEach((btn, c) => {
+    btn.disabled = !playable || b[c].length >= H;
+    btn.classList.toggle('hint', c === hintCol);
+    btn.setAttribute('aria-label', `Column ${c + 1}, ${b[c].length} of 6 filled`);
+  });
+  document.getElementById('undo').disabled = busy || !moves.some((_, i) => i % 2 === youIdx());
+  document.getElementById('hint').disabled = !playable;
+  document.getElementById('moves').textContent = moves.length
+    ? 'Moves: ' + moves.map(c => c + 1).join(' ') : '';
+  renderStatus();
+}
+
+function renderStatus() {
+  let html;
+  if (!engineReady) html = 'Loading engine…';
+  else if (over) {
+    if (over.winner === -1) html = 'Board full. It’s a draw.';
+    else if (over.winner === youIdx()) html = '<span class="chip you"></span> You win. Four in a row!';
+    else html = '<span class="chip eng"></span> The engine wins.';
+  } else if (busy && !humanToMove()) html = '<span class="thinking"><span class="dot"></span></span> Engine is thinking…';
+  else if (busy) html = 'Looking for a hint…';
+  else html = '<span class="chip you"></span> Your move. Tap a column.';
+  statusEl.innerHTML = html;
+}
+
+// ---------------------------------------------------------------- telemetry
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
+function showStats(s, forEngine) {
+  lastStats = s;
+  document.getElementById('t-depth').textContent = s.depth ? `${s.depth} ${s.depth === 1 ? 'ply' : 'plies'}` : 'opening book';
+  document.getElementById('t-nodes').textContent = fmt(s.nodes);
+  document.getElementById('t-speed').textContent = s.ms > 5 ? fmt(s.nodes / s.ms * 1000) + '/s' : '–';
+  document.getElementById('t-time').textContent = (s.ms / 1000).toFixed(2) + ' s';
+  if (forEngine) document.getElementById('t-move').textContent = 'column ' + (s.col + 1);
+
+  // Verdict from the searching side's point of view, translated to engine/you.
+  const v = document.getElementById('verdict');
+  const engSide = forEngine;
+  let cls = '', text, lean = 0;
+  if (s.result === 1 || s.score > 900) {
+    const endPly = s.score > 900 ? 1000 - s.score : null;
+    const left = endPly ? Math.ceil((endPly - s.moves) / 2) : null;
+    if (engSide) { cls = 'eng'; text = left === 1 ? 'The engine wins with this move.' : 'Proven: the engine has a forced win' + (left ? ` within ${left} of its moves.` : '.'); lean = 1; }
+    else { cls = 'you'; text = 'You have a forced win. Find it!'; lean = -1; }
+  } else if (s.result === -1 || s.score < -900) {
+    if (engSide) { cls = 'you'; text = 'Proven: you have a forced win from here.'; lean = -1; }
+    else { cls = 'eng'; text = 'The engine has a forced win against any defence.'; lean = 1; }
+  } else if (s.result === 0) {
+    cls = 'draw'; text = 'Proven: a draw with best play from both sides.'; lean = 0;
+  } else {
+    const sc = engSide ? s.score : -s.score;  // engine-positive
+    lean = Math.max(-1, Math.min(1, sc / 160));
+    text = Math.abs(sc) < 15 ? 'Not yet solved. The position looks balanced.'
+      : sc > 0 ? 'Not yet solved. The engine prefers its position.' : 'Not yet solved. The engine thinks you stand better.';
+    text += ` (eval ${sc > 0 ? '+' : ''}${sc})`;
+  }
+  v.className = 'verdict ' + cls;
+  v.textContent = text;
+  const m = document.getElementById('meter');
+  m.style.left = lean >= 0 ? '50%' : (50 + lean * 50) + '%';
+  m.style.width = Math.abs(lean) * 50 + '%';
+  m.style.background = lean >= 0 ? 'var(--eng)' : 'var(--you)';
+}
+
+// ---------------------------------------------------------------- flow
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function engineMove() {
+  if (over || humanToMove()) { busy = false; render(); return; }
+  busy = true; render();
+  const L = LEVELS[level];
+  const gameAtStart = moves.join(',');
+  const t0 = performance.now();
+  const s = await search(moves, { depth: L.depth, ms: L.ms, solve: L.solve });
+  const wait = 420 - (performance.now() - t0);
+  if (wait > 0) await sleep(wait);
+  if (moves.join(',') !== gameAtStart) return;  // game changed while thinking
+  let col = s.col;
+  // Casual: occasionally swap in a random move, but never pass up a win in one.
+  const instantWin = s.result === 1 && s.depth === 1;
+  if (L.noise && !instantWin && Math.random() < L.noise) {
+    const h = boardFrom(moves).map(x => x.length);
+    const legal = [...Array(W).keys()].filter(c => h[c] < H);
+    col = legal[Math.floor(Math.random() * legal.length)];
+  }
+  showStats({ ...s, col }, true);
+  moves.push(col);
+  over = outcome(moves);
+  busy = false;
+  render(true);
+}
+
+function humanPlay(c) {
+  if (!engineReady || busy || over || !humanToMove()) return;
+  if (boardFrom(moves)[c].length >= H) return;
+  hintCol = -1;
+  moves.push(c);
+  over = outcome(moves);
+  busy = !over;  // board stays locked until the engine has replied
+  render(true);
+  if (!over) setTimeout(engineMove, reduceMotion ? 0 : 380);
+}
+
+function newGame() {
+  reqId++;  // orphan any in-flight search
+  pending.clear();
+  moves = []; over = null; busy = false; hintCol = -1;
+  document.getElementById('t-move').textContent = '–';
+  render();
+  if (!humanToMove()) engineMove();
+}
+
+function undo() {
+  if (busy) return;
+  // Take back to just before the human's most recent move.
+  let i = moves.length - 1;
+  while (i >= 0 && i % 2 !== youIdx()) i--;
+  if (i < 0) return;
+  moves = moves.slice(0, i);
+  over = null; hintCol = -1;
+  render();
+}
+
+async function hint() {
+  if (busy || over || !humanToMove()) return;
+  busy = true; render();
+  const s = await search(moves, { depth: 64, ms: 1500, solve: true });
+  busy = false;
+  hintCol = s.col;
+  showStats(s, false);
+  render();
+}
+
+// ---------------------------------------------------------------- controls
+document.getElementById('new').addEventListener('click', newGame);
+document.getElementById('undo').addEventListener('click', undo);
+document.getElementById('hint').addEventListener('click', hint);
+document.querySelectorAll('input[name=level]').forEach(r => r.addEventListener('change', () => {
+  level = +r.value; savePrefs(); syncControls();
+}));
+document.querySelectorAll('input[name=first]').forEach(r => r.addEventListener('change', () => {
+  humanFirst = r.value === 'you'; savePrefs(); syncControls(); newGame();
+}));
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest && ev.target.closest('input')) return;
+  const n = parseInt(ev.key, 10);
+  if (n >= 1 && n <= 7) humanPlay(n - 1);
+});
+function syncControls() {
+  document.getElementById('lvl' + level).checked = true;
+  document.getElementById(humanFirst ? 'first-you' : 'first-eng').checked = true;
+  document.getElementById('level-note').textContent = LEVELS[level].note;
+}
+
+// Keep the game across live page updates.
+window.claude?.hot?.snapshot?.(() => ({ moves, level, humanFirst }));
+
+function boot() {
+  syncControls();
+  over = outcome(moves);
+  render();
+  if (!over && !humanToMove()) engineMove();
+}
+
+function start(data) {
+  loadPrefs();
+  if (data && Array.isArray(data.moves)) {
+    moves = data.moves; level = data.level ?? level; humanFirst = data.humanFirst ?? humanFirst;
+  }
+  syncControls();
+  render();
+  worker.postMessage({ type: 'init', bytes: wasmBytes }, [wasmBytes.buffer]);
+}
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+
+</body>
+</html>
