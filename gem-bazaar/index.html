@@ -57,11 +57,14 @@ header.top{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding-b
 .mini svg{width:12px;height:12px}
 
 /* 후원자 */
-.patrons{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.patron{width:76px;border-radius:8px;padding:6px;background:linear-gradient(160deg,#5a3d2c,#3a2619);border:1px solid #7b5a3c;display:grid;grid-template-columns:auto 1fr;gap:4px;align-items:start;box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.patron .pv{font-family:var(--f-display);font-size:22px;color:var(--parch);line-height:1}
-.patron .crest{justify-self:end;width:22px;height:22px;opacity:.85}
-.patron .req{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px}
+.patrons{display:grid;grid-template-columns:repeat(5,minmax(0,80px));gap:6px;margin-bottom:16px}
+.opt .patron{width:96px}
+.patron{min-width:0;border-radius:8px;padding:3px;background:linear-gradient(160deg,#5a3d2c,#3a2619);border:1px solid #7b5a3c;display:grid;gap:4px;position:relative;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.patron .portrait{display:block;width:100%;height:auto;border-radius:5px;border:1px solid #2a1a12}
+.patron .pn{font-size:10.5px;word-break:keep-all;color:var(--parch);text-align:center;line-height:1.2}
+.patron .pv{position:absolute;left:7px;top:5px;font-family:var(--f-display);font-size:20px;color:#fff;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.9)}
+.patron .req{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.patron .req span{width:16px;height:19px;font-size:11.5px}
 .req span{width:18px;height:20px;border-radius:3px;display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 
 /* 시장 */
@@ -72,15 +75,17 @@ header.top{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding-b
 .deck .cnt{font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums}
 .deck.empty{opacity:.3}
 .card{background:linear-gradient(180deg,var(--parch) 0%,var(--parch) 34%,var(--parch-2) 100%);color:var(--ink);border:1px solid #c8b591;box-shadow:0 2px 0 rgba(0,0,0,.25),0 4px 10px rgba(0,0,0,.25);overflow:hidden;text-align:left;width:100%;display:block;transition:transform .15s}
-.card::before{content:"";position:absolute;inset:0 0 auto 0;height:30%;background:var(--band);opacity:.9}
+.card .art{position:absolute;inset:0;width:100%;height:100%;display:block}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:24%;background:var(--band);opacity:.92;z-index:1;box-shadow:0 1px 0 rgba(0,0,0,.25)}
+.card .p,.card .bonus,.card .cost,.card .tier-mark{z-index:2}
 .card .p{position:absolute;left:6px;top:3px;font-family:var(--f-display);font-size:clamp(16px,4.6vw,24px);line-height:1;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .card .bonus{position:absolute;right:4px;top:4px;width:clamp(16px,4.6vw,22px);height:clamp(16px,4.6vw,22px);filter:drop-shadow(0 1px 1px rgba(0,0,0,.5))}
-.card .cost{position:absolute;left:4px;bottom:4px;display:grid;gap:2px}
-.cost span{display:flex;align-items:center;justify-content:center;width:clamp(16px,4.4vw,21px);height:clamp(16px,4.4vw,21px);border-radius:50%;font-size:clamp(10px,2.9vw,12px);font-weight:700;font-variant-numeric:tabular-nums;border:1px solid rgba(0,0,0,.25)}
-.card .tier-mark{position:absolute;right:5px;bottom:3px;font-family:var(--f-display);font-size:10px;color:var(--ink-soft);letter-spacing:.1em}
+.card .cost{position:absolute;left:4px;bottom:4px;display:grid;gap:2px;grid-template-rows:repeat(3,auto);grid-auto-flow:column;align-content:end}
+.cost span{box-shadow:0 0 0 1.5px rgba(255,255,255,.85),0 1px 2px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;width:clamp(16px,4.4vw,21px);height:clamp(16px,4.4vw,21px);border-radius:50%;font-size:clamp(10px,2.9vw,12px);font-weight:700;font-variant-numeric:tabular-nums;border:1px solid rgba(0,0,0,.25)}
+.card .tier-mark{position:absolute;right:4px;bottom:3px;font-family:var(--f-display);font-size:10px;color:var(--parch);letter-spacing:.1em;text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .card.light .p{color:var(--ink);text-shadow:none}
 .card.can{outline:2px solid var(--brass);outline-offset:2px}
-.card.can::after{content:"구매 가능";position:absolute;right:3px;bottom:16px;font-size:9px;background:var(--brass);color:var(--velvet);padding:1px 4px;border-radius:3px;font-weight:700}
+.card.can::after{z-index:2;content:"구매 가능";position:absolute;right:3px;bottom:16px;font-size:9px;background:var(--brass);color:var(--velvet);padding:1px 4px;border-radius:3px;font-weight:700}
 .card:hover{transform:translateY(-2px)}
 .slot-empty{aspect-ratio:5/7;border:1px dashed rgba(255,255,255,.1);border-radius:8px}
 .card.back{background:repeating-linear-gradient(45deg,var(--velvet-3) 0 6px,var(--velvet-2) 6px 12px);border-color:var(--brass-soft)}
@@ -291,7 +296,7 @@ function describe(e){
     case 'take': { const g=e.g.map((n,c)=>n?`${GEM[c]}${n>1?' ×'+n:''}`:'').filter(Boolean).join(', '); return `${who} ${g} 가져감`; }
     case 'res': return e.blind ? `${who} ${TIER[e.tier]}단계 덱에서 몰래 예약${e.gold?' · 금 +1':''}` : `${who} ${GEM[e.card.c]} 카드 예약${e.gold?' · 금 +1':''}`;
     case 'buy': return `${who} ${GEM[e.card.c]} 카드 구매${e.card.p?` · ${e.card.p}점`:''}`;
-    case 'noble': return `${who} 후원자 방문 · 3점`;
+    case 'noble': return `${who} 후원자 ${PATRONS[e.n].name} 방문 · 3점`;
     case 'disc': return `${who} ${GEM[e.g.findIndex(x=>x)]} 반납`;
     case 'final': return `${who} 15점 달성! 이번 라운드가 마지막이에요`;
     case 'pass': return `${who} 할 수 있는 행동이 없어 넘김`;
@@ -343,12 +348,12 @@ function cardHTML(c, opts={}){
   const label = `${GEM[c.c]} 카드, ${c.p}점, 비용 ${c.cost.map((n,i)=>n?GEM[i]+' '+n:'').filter(Boolean).join(' ')}`;
   const tag = opts.tag || 'button';
   return `<${tag} ${tag==='button'?'type="button"':''} class="card ${c.c===0?'light':''} ${opts.can?'can':''}" style="--band:linear-gradient(135deg,var(--g${c.c}),var(--g${c.c}e))" ${opts.act?`data-act="${opts.act}"`:''} aria-label="${label}">
-    ${c.p?`<span class="p">${c.p}</span>`:''}${gem(c.c,'bonus')}
+    ${art(c)}${c.p?`<span class="p">${c.p}</span>`:''}${gem(c.c,'bonus')}
     <span class="cost">${cost}</span><span class="tier-mark">${TIER[c.t]}</span></${tag}>`;
 }
-function nobleHTML(n){
-  return `<div class="patron" aria-label="후원자 3점, 조건 ${n.req.map((v,i)=>v?GEM[i]+' 보너스 '+v:'').filter(Boolean).join(', ')}">
-    <span class="pv">3</span><svg class="crest"><use href="#crest"/></svg>
+function nobleHTML(n, named){
+  return `<div class="patron" title="${PATRONS[n.id].name}" aria-label="후원자 ${PATRONS[n.id].name}, 3점, 조건 ${n.req.map((v,i)=>v?GEM[i]+' 보너스 '+v:'').filter(Boolean).join(', ')}">
+    ${portrait(n)}<span class="pv">3</span>${named?`<span class="pn">${PATRONS[n.id].name}</span>`:''}
     <div class="req">${n.req.map((v,i)=>v?`<span style="${chipCol(i)}">${v}</span>`:'').join('')}</div></div>`;
 }
 const myTurn = () => st.phase!=='over' && !st.players[st.cur].ai && st.cur===viewP;
@@ -363,7 +368,8 @@ function render(){
       <div class="mini">${p.bonus.map((b,c)=>`<i>${gem(c)}${b}</i>`).join('')}</div>
       <div class="mini"><i>토큰 ${tok}</i><i>예약 ${p.reserved.length}</i></div></div>`;
   }).join('');
-  $('patrons').innerHTML = st.nobles.map(nobleHTML).join('') || `<p class="legend">남은 후원자가 없어요</p>`;
+  $('patrons').style.gridTemplateColumns = `repeat(${st.players.length+1},minmax(0,80px))`;
+  $('patrons').innerHTML = st.nobles.map(n=>nobleHTML(n)).join('') || `<p class="legend">남은 후원자가 없어요</p>`;
 
   const legal = new Set(st.legal), mine = myTurn() && st.phase==='main';
   $('market').innerHTML = [2,1,0].map(t=>`<div class="tier">
@@ -398,7 +404,7 @@ function renderSeat(){
       <p class="legend" style="margin:8px 0 0">큰 숫자는 토큰, <span>+숫자</span>는 카드 보너스(영구 할인)예요. 금은 아무 색으로나 쓸 수 있어요.</p>
     </div>
     <div><p class="label">예약 카드 <b>최대 3장</b></p><div class="reserved">${res}</div></div>
-    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(()=>`<div class="patron" style="width:44px"><span class="pv">3</span></div>`).join('')}</div></div>`:''}
+    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(id=>`<div class="patron" style="width:60px" title="${PATRONS[id].name}">${portrait({id})}<span class="pv">3</span><span class="pn">${PATRONS[id].name}</span></div>`).join('')}</div></div>`:''}
     <div><p class="label">기록</p><ul class="log">${st.log.slice(-12).reverse().map(e=>`<li>${describe(e)}</li>`).join('') || '<li>첫 수를 기다리는 중</li>'}</ul></div>
   </section>`;
 }
@@ -510,7 +516,7 @@ function deckSheet(t){
 }
 function showNobles(){
   openSheet(`<h3>어느 후원자를 모실까요?</h3><p>한 턴에 한 명만 모실 수 있어요. 남은 후원자는 나중에 찾아올 수도 있어요.</p>
-    <div class="row">${st.pending.map((ni,i)=>`<button type="button" class="opt" data-act="noble${i}">${nobleHTML(st.nobles[ni])}</button>`).join('')}</div>`);
+    <div class="row">${st.pending.map((ni,i)=>`<button type="button" class="opt" data-act="noble${i}">${nobleHTML(st.nobles[ni],true)}</button>`).join('')}</div>`);
 }
 function showHandoff(){
   openSheet(`<h3>${names[st.cur]} 차례</h3><p>기기를 ${names[st.cur]}에게 넘겨 주세요. 예약 카드가 보이지 않도록 다른 사람의 화면은 가려 두었어요.</p>
@@ -543,6 +549,101 @@ function showRules(){
     <li>카드 보너스가 후원자 조건을 채우면 후원자가 찾아와 <b>3점</b>을 줘요.</li>
     <li>누군가 <b>15점</b>에 닿으면 그 라운드를 끝까지 마치고 점수가 가장 높은 상인이 이겨요.</li></ol>
     <button class="btn solid" type="button" data-act="close">알겠어요</button>`);
+}
+
+/* ---------- 일러스트 (오리지널, SVG로 그림) ---------- */
+// 카드: 단계마다 무대가 다르다. I = 광산, II = 교역(대상·공방), III = 도시(궁전·항구)
+const SKY = [
+  ['#4a3346','#9a6a4a','#e7b06a'],   // I  광산의 저녁
+  ['#3f6f93','#9ec3d4','#f3e1b5'],   // II 한낮의 교역로
+  ['#2a1f4a','#7d4a6b','#e59a52']    // III 노을 진 도시
+];
+function crystal(x, y, h, w, c){
+  const t = y-h, s = y-h*0.72;
+  return `<polygon points="${x},${t} ${x+w/2},${s} ${x+w/2},${y} ${x-w/2},${y} ${x-w/2},${s}" fill="var(--g${c})" stroke="var(--g${c}e)" stroke-width=".7"/>
+    <polygon points="${x},${t} ${x+w/2},${s} ${x},${s+h*0.12}" fill="#fff" opacity=".35"/>`;
+}
+function sky(t, sun){
+  const [a,b,c] = SKY[t];
+  return `<rect width="50" height="70" fill="${a}"/><rect y="22" width="50" height="48" fill="${b}" opacity=".85"/>
+    <rect y="38" width="50" height="32" fill="${c}" opacity=".55"/>${sun?`<circle cx="${sun[0]}" cy="${sun[1]}" r="${sun[2]}" fill="#fff4cf" opacity=".75"/>`:''}`;
+}
+const SCENES = [
+  [ // I: 광산
+    c => `${sky(0,[38,26,5])}
+      <path d="M0 70V40Q10 30 22 34T50 30V70Z" fill="#3b2a2a"/><path d="M0 70V50Q14 42 30 48T50 46V70Z" fill="#59403a"/>
+      <path d="M24 70V52Q31 40 38 52V70Z" fill="#160e10"/>
+      <path d="M22 52h18M23 52v18M39 52v18" stroke="#8a6a44" stroke-width="1.6"/>
+      ${crystal(40,64,12,5,c)}${crystal(45,66,8,4,c)}${crystal(35,67,7,3.5,c)}`,
+    c => `${sky(0,[12,30,4])}
+      <path d="M0 70V36L14 30 26 38 38 28 50 34V70Z" fill="#4a3434"/><path d="M0 70V48L20 44 36 50 50 46V70Z" fill="#6a4b40"/>
+      ${crystal(30,50,10,5,c)}${crystal(36,48,7,4,c)}${crystal(42,53,9,4.5,c)}
+      <path d="M26 66l12-10" stroke="#c9b28a" stroke-width="1.4"/><path d="M35 54q4 1 6 5" stroke="#9aa0a8" stroke-width="2" fill="none"/>
+      <rect x="30" y="61" width="12" height="5" rx="1" fill="#2a1d1a"/><circle cx="33" cy="67" r="1.6" fill="#1a1210"/><circle cx="40" cy="67" r="1.6" fill="#1a1210"/>`
+  ],
+  [ // II: 교역
+    c => `${sky(1,[40,18,5])}
+      <path d="M0 70V52Q16 44 30 50T50 48V70Z" fill="#d7b27a"/><path d="M0 70V60Q20 54 50 60V70Z" fill="#c09257"/>
+      <g fill="#5a3b26"><ellipse cx="33" cy="48" rx="8" ry="4"/><path d="M29 45q3-6 6 0z"/><path d="M40 47l4-8 2 1-3 9z"/><ellipse cx="45.5" cy="39" rx="2.6" ry="1.6"/>
+      <rect x="27" y="50" width="1.3" height="9"/><rect x="30" y="50" width="1.3" height="9"/><rect x="36" y="50" width="1.3" height="9"/><rect x="39" y="50" width="1.3" height="9"/></g>
+      <rect x="26" y="40" width="7" height="5" fill="#8a5a33" stroke="#3e2615" stroke-width=".5"/>${crystal(29.5,41,4,3,c)}`,
+    c => `${sky(1)}
+      <rect width="50" height="70" fill="#6b4a36" opacity=".9"/><rect x="28" y="8" width="16" height="18" rx="8" fill="#f3e1b5" opacity=".9"/>
+      <path d="M36 8v18M28 17h16" stroke="#6b4a36" stroke-width="1.2"/>
+      <rect y="50" width="50" height="20" fill="#3d281d"/><rect x="18" y="48" width="32" height="3" fill="#8a5a33"/>
+      <ellipse cx="36" cy="47" rx="9" ry="2.5" fill="#7a2f3a"/>${crystal(36,47,12,8,c)}
+      <circle cx="22" cy="40" r="3" fill="#ffd27a" opacity=".85"/><path d="M22 43v5" stroke="#b08d4a" stroke-width="1.2"/>`
+  ],
+  [ // III: 도시
+    c => `${sky(2,[14,30,6])}
+      <g fill="#20142c"><rect x="20" y="40" width="30" height="30"/><path d="M24 40q11-16 22 0z"/><rect x="16" y="28" width="3" height="42"/><path d="M15 28l2.5-6 2.5 6z"/>
+      <rect x="45" y="32" width="3" height="38"/><path d="M44 32l2.5-6 2.5 6z"/><rect x="0" y="52" width="22" height="18"/><path d="M2 52q7-9 14 0z"/></g>
+      <path d="M24 40q11-16 22 0z" fill="var(--g${c})" opacity=".85"/><path d="M28 38q7-10 14 0" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".8"/>
+      <g fill="#ffd27a" opacity=".9"><rect x="27" y="48" width="2" height="3"/><rect x="34" y="48" width="2" height="3"/><rect x="41" y="48" width="2" height="3"/><rect x="6" y="58" width="2" height="3"/></g>`,
+    c => `${sky(2,[40,30,5])}
+      <rect y="50" width="50" height="20" fill="#1f2c4a"/><path d="M0 54q6-2 12 0t12 0 12 0 14 0M0 60q6-2 12 0t12 0 12 0 14 0" stroke="#7d9cc6" stroke-opacity=".5" fill="none"/>
+      <path d="M16 50h28l-4 6H20z" fill="#3a2418"/><path d="M29 18v32" stroke="#3a2418" stroke-width="1.2"/>
+      <path d="M30 20q10 8 0 26z" fill="#f1e6d0"/><path d="M28 24q-9 7 0 20z" fill="#e3d3b4"/>
+      <path d="M29 18l7 2-7 2z" fill="var(--g${c})"/>${crystal(37,50,5,3.5,c)}`
+  ]
+];
+function art(c){ return `<svg class="art" viewBox="0 0 50 70" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${SCENES[c.t][c.id % 2](c.c)}</svg>`; }
+
+// 후원자: 저마다 다른 오리지널 인물 (이름과 초상)
+const PATRONS = [
+  {name:'아델 백작부인', skin:'#f0c9a8', hair:'#5a3a22', hat:'tiara'},
+  {name:'라시드 태수', skin:'#b97f55', hair:'#1e1612', hat:'turban'},
+  {name:'마르코 선장', skin:'#e2b08a', hair:'#7a5232', hat:'tricorne'},
+  {name:'세린 공주', skin:'#f4d3b6', hair:'#2b1a14', hat:'veil'},
+  {name:'오스윈 학자', skin:'#e8bf9c', hair:'#cfc6b8', hat:'cap'},
+  {name:'하나 대상인', skin:'#d9a57c', hair:'#2a1c16', hat:'pin'},
+  {name:'빅토르 남작', skin:'#f1c7a4', hair:'#8a6a4a', hat:'tophat'},
+  {name:'이사벨 후작', skin:'#e7b896', hair:'#a0472c', hat:'feather'},
+  {name:'카심 술탄', skin:'#a8714b', hair:'#140e0b', hat:'crown'},
+  {name:'루시앙 기사', skin:'#efc4a0', hair:'#d8b46a', hat:'laurel'}
+];
+function portrait(n){
+  const P = PATRONS[n.id], ci = (n.req||[]).findIndex(v=>v>0), cloth = `var(--g${ci>=0?ci:n.id%5})`;
+  const head = {
+    tiara:   `<path d="M13 9l2-3 2 2 3-3 3 3 2-2 2 3z" fill="#e2b43f"/><circle cx="20" cy="6" r="1" fill="#c93b4c"/>`,
+    turban:  `<path d="M11 12q0-9 9-9t9 9q-9-3-18 0z" fill="#efe9dc"/><circle cx="20" cy="7" r="1.4" fill="var(--g1)"/>`,
+    tricorne:`<path d="M8 10q12-9 24 0q-12-3-24 0z" fill="#20142c"/><path d="M12 9q8-5 16 0" stroke="#e2b43f" stroke-width=".6" fill="none"/>`,
+    veil:    `<path d="M10 22q0-19 10-19t10 19l-3-2q0-12-7-12t-7 12z" fill="#7d4a6b" opacity=".9"/>`,
+    cap:     `<path d="M12 9q8-8 16 0z" fill="#2b2a33"/><rect x="11" y="8" width="18" height="2" fill="#2b2a33"/>`,
+    pin:     `<path d="M12 11q8-10 16 0q-3-4-8-4t-8 4z" fill="${P.hair}"/><circle cx="26" cy="7" r="1.6" fill="var(--g2)"/><path d="M26 7l4-3" stroke="#e2b43f" stroke-width=".7"/>`,
+    tophat:  `<rect x="14" y="0" width="12" height="9" fill="#1b1520"/><rect x="11" y="8" width="18" height="2" fill="#1b1520"/><rect x="14" y="6" width="12" height="1.4" fill="var(--g3)"/>`,
+    feather: `<path d="M11 10q9-8 18 0z" fill="#5a2a3a"/><path d="M25 7q8-8 6 4" stroke="#efe9dc" stroke-width="1.4" fill="none"/>`,
+    crown:   `<path d="M12 9V3l3 3 5-4 5 4 3-3v6z" fill="#e2b43f"/><circle cx="20" cy="6" r="1.2" fill="var(--g2)"/>`,
+    laurel:  `<path d="M12 11q2-6 8-7M28 11q-2-6-8-7" stroke="#6e8f3a" stroke-width="1.6" fill="none" stroke-dasharray="2 1"/>`
+  }[P.hat];
+  return `<svg class="portrait" viewBox="0 0 40 34" aria-hidden="true">
+    <rect width="40" height="34" fill="#2a1a22"/><circle cx="20" cy="15" r="15" fill="#4a2f2a" opacity=".6"/>
+    <path d="M4 34q2-10 16-10t16 10z" fill="${cloth}"/><path d="M15 25l5 5 5-5" fill="#efe9dc" opacity=".9"/>
+    <path d="M12 13q0-9 8-9t8 9v2q-8-3-16 0z" fill="${P.hair}"/>
+    <ellipse cx="20" cy="15" rx="6.2" ry="7.4" fill="${P.skin}"/>
+    <circle cx="17.6" cy="14.6" r=".8" fill="#2a1a14"/><circle cx="22.4" cy="14.6" r=".8" fill="#2a1a14"/>
+    <path d="M18.4 18.6q1.6 1 3.2 0" stroke="#8a4a3a" stroke-width=".7" fill="none"/>
+    ${head}</svg>`;
 }
 
 /* ---------- 코치 ---------- */
