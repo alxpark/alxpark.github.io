@@ -22,6 +22,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Darkroom Filter Lab | `/darkroom-filter-lab/` | private repo `alxpark/darkroom-filter-lab` (`./build.sh` → `dist/index.html`) |
 | Rust NES Workbench | `/nes/` | private repo `alxpark/nes-wasm` (`python3 web/bundle.py . --site` → `dist/index.html`) |
 | Four Deep | `/four-deep/` | private repo `alxpark/four-deep` (`./build.sh` → `index.html`) |
+| 젬 바자르 | `/gem-bazaar/` | repo `alxpark/gem-bazaar` (`./build.sh` → `dist/index.html`) |
 
 ## Adding an app
 
