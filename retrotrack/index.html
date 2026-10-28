@@ -133,6 +133,42 @@ body[data-view="viz"] #pattern { cursor: default }
 .app::backdrop { background: var(--case-lo) }
 @media (max-width: 560px) { .readout { font-size: 19px; flex-basis: 100% } .viz-ctl .fld select { font-size: 17px } #vFull { display: none } }
 
+/* web loader popup */
+.wl-back { position: fixed; inset: 0; z-index: 50; background: rgba(4, 7, 16, 0.72); display: grid; place-items: start center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); overflow-y: auto }
+.wl { width: min(720px, 100%); padding: 10px; display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); margin-top: 4vh }
+.wl > * { min-width: 0 }
+.wl-head { display: flex; justify-content: space-between; align-items: center; gap: 10px }
+.wl-head h2 { margin: 0; font-family: var(--f-label); font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--ink); text-transform: uppercase }
+.wl-tabs { padding: 0 }
+.wl-pane { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr) }
+.wl-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end }
+.wl-row .grow { flex: 1 1 220px }
+.wl-row .grow input { width: 100% }
+.wl-list { background: var(--screen); height: min(300px, 40vh); overflow-y: auto; scrollbar-color: var(--case-hi) var(--screen);
+  border: 2px solid; border-color: var(--case-lo) var(--case-hi) var(--case-hi) var(--case-lo) }
+.wl-list:empty { display: none }
+.wl-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 4px 10px; cursor: pointer; border-bottom: 1px solid var(--row-beat);
+  width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; color: var(--ink); font: inherit; min-height: 0; text-transform: none; letter-spacing: 0 }
+.wl-item:hover, .wl-item:focus-visible { background: var(--row-bar); color: var(--amber); outline: none }
+.wl-item .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.wl-item .m { color: var(--dim); white-space: nowrap; font-variant-numeric: tabular-nums }
+.wl-item .s { grid-column: 1 / -1; color: var(--dim); font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.wl-item.dir .t { color: var(--smp) }
+.wl-item.off { opacity: .45; cursor: default }
+.wl-crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; color: var(--dim) }
+.wl-crumbs button { min-height: 26px; padding: 2px 8px }
+.wl-pager { display: flex; gap: 10px; align-items: center; justify-content: center; color: var(--dim) }
+.wl-note { margin: 0; color: var(--dim); font-size: 17px; max-width: 70ch }
+.wl-note a, .wl-fallback a { color: var(--smp) }
+.wl-warn { margin: 0; padding: 6px 10px; color: var(--fx); background: var(--well); font-size: 18px }
+.wl-key summary { cursor: pointer; padding: 2px 0 }
+.wl-key[open] summary { margin-bottom: 6px }
+.wl-status { min-height: 22px; color: var(--phos); font-size: 18px }
+.wl-status.err { color: var(--rec) }
+.wl-fallback { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--ink); font-size: 18px }
+.wl-fallback .btn { text-decoration: none }
+
 @media (max-width: 900px) {
   .mid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
   .mid .scope-panel { grid-column: 1 / -1 }
@@ -162,6 +198,7 @@ body[data-view="viz"] #pattern { cursor: default }
       <button id="bStop" title="Stop (Esc)">■ Stop</button>
       <button id="bEdit" class="rec" title="Edit / record mode (Space)">● Edit</button>
       <button id="bFollow" class="on" title="Pattern view follows playback">Follow</button>
+      <button id="bWeb" title="Load a MOD from The Mod Archive, Modland or AMP (Ctrl+O)">Web…</button>
     </div>
     <div class="viewmenu" role="group" aria-label="View">
       <span class="lbl">View</span>
@@ -262,12 +299,13 @@ body[data-view="viz"] #pattern { cursor: default }
         <button id="fNew">New song</button>
         <button id="fDemo">Load demo</button>
         <button id="fOpen">Open .MOD…</button>
+        <button id="fWeb">Load from web…</button>
         <button id="fSave">Save .MOD (zip)</button>
         <button id="fWav">Export WAV (zip)</button>
         <label class="fld"><span class="lbl">WAV loops</span><select id="fLoops"><option>1</option><option>2</option></select></label>
       </div>
       <p class="lbl" id="fileNote" style="margin:0;text-transform:none;font-family:var(--f-data);font-size:18px;color:var(--dim);letter-spacing:0">Songs are standard ProTracker MODs (M.K. for 4 channels, 6CHN/8CHN otherwise) and open in any tracker. Downloads arrive zipped. Your work autosaves in this browser. You can also drop a .mod or an audio file onto the page.</p>
-      <input type="file" id="fMod" accept=".mod,.MOD,.nst,.m15,.stk,*/*">
+      <input type="file" id="fMod" accept=".mod,.MOD,.nst,.m15,.stk,.gz,.zip,*/*">
     </div>
     <div class="tab-body" id="tab-set" hidden>
       <div class="grid-form">
@@ -284,7 +322,7 @@ body[data-view="viz"] #pattern { cursor: default }
         <div>
           <h3>Keys</h3>
           <p><kbd>Z S X D C V G B H N J M</kbd> play the lower octave, <kbd>Q 2 W 3 E R 5 T 6 Y 7 U I</kbd> the upper one. In Edit mode they write notes with the current sample.</p>
-          <p><kbd>0–9 A–F</kbd> type into the sample and effect columns; a finished field drops to the next row. <kbd>Space</kbd> toggles Edit, <kbd>Enter</kbd> plays the song, <kbd>Shift+Enter</kbd> the pattern, <kbd>Esc</kbd> stops. <kbd>F4</kbd> cycles the Editor, Visual and Scopes views.</p>
+          <p><kbd>0–9 A–F</kbd> type into the sample and effect columns; a finished field drops to the next row. <kbd>Space</kbd> toggles Edit, <kbd>Enter</kbd> plays the song, <kbd>Shift+Enter</kbd> the pattern, <kbd>Esc</kbd> stops. <kbd>F4</kbd> cycles the Editor, Visual and Scopes views. <kbd>Ctrl+O</kbd> or the Web… button loads a song from The Mod Archive, Modland or AMP.</p>
           <p><kbd>Arrows</kbd> move, <kbd>Tab</kbd> jumps channels, <kbd>PgUp/PgDn</kbd> move 16 rows, <kbd>Del</kbd> clears, <kbd>Ins</kbd>/<kbd>Backspace</kbd> insert or pull rows. <kbd>F1/F2</kbd> pick the octave, <kbd>Ctrl+←/→</kbd> the sample.</p>
           <p><kbd>Shift+arrows</kbd> or drag select a block. <kbd>Ctrl+C X V</kbd> copy, cut, paste. <kbd>Ctrl+↑/↓</kbd> transpose a semitone (add Shift for an octave). <kbd>Ctrl+Z / Ctrl+Y</kbd> undo and redo.</p>
           <p>Tap a channel header to mute it, long-press or right-click to solo.</p>
@@ -345,6 +383,72 @@ body[data-view="viz"] #pattern { cursor: default }
       <button data-k="ArrowUp">▲</button><button data-k="ArrowDown">▼</button><button data-k="ArrowLeft">◀</button><button data-k="ArrowRight">▶</button>
       <button data-k="Tab">Ch ▸</button><button data-k="Delete">Del</button><button data-k="Insert">Ins</button><button data-k="Backspace">Pull</button>
     </div>
+  </section>
+</div>
+
+
+<div class="wl-back" id="wl" hidden>
+  <section class="wl bevel" role="dialog" aria-modal="true" aria-labelledby="wlTitle">
+    <header class="wl-head">
+      <h2 id="wlTitle">Load a MOD from the web</h2>
+      <button id="wlClose" title="Close (Esc)">Close</button>
+    </header>
+    <div class="tabs wl-tabs" role="tablist">
+      <button data-src="ma" class="on">Mod Archive</button>
+      <button data-src="ml">Modland</button>
+      <button data-src="amp">AMP</button>
+    </div>
+    <p class="wl-warn" id="wlClaude" hidden>This view can't reach other websites. Open RETRO//TRACK at <b>alxpark.github.io/retrotrack</b> to load songs straight from these sites, or download a file here and drop it onto the tracker.</p>
+
+    <div class="wl-pane" id="wl-ma">
+      <div class="wl-row">
+        <label class="fld grow"><span class="lbl">Module link or ID</span><input type="text" id="maId" placeholder="modarchive.org/…moduleid=12345 or 12345" autocomplete="off" spellcheck="false"></label>
+        <button id="maLoad">Load</button>
+      </div>
+      <div class="wl-row">
+        <label class="fld grow"><span class="lbl">Search songs and files</span><input type="search" id="maQ" placeholder="e.g. space debris" autocomplete="off"></label>
+        <button id="maGo">Search</button>
+      </div>
+      <details class="wl-key" id="maKeyBox">
+        <summary class="lbl">API key for search</summary>
+        <div class="wl-row">
+          <label class="fld grow"><span class="lbl">Your Mod Archive API key</span><input type="text" id="maKey" autocomplete="off" spellcheck="false" placeholder="paste your key"></label>
+          <button id="maKeySave">Save key</button>
+        </div>
+        <p class="wl-note">Search uses The Mod Archive's XML API, which needs your own free key. It is kept only in this browser. Loading by link or ID works without one.</p>
+      </details>
+      <div class="wl-list" id="maList" role="listbox" aria-label="Mod Archive results"></div>
+      <div class="wl-pager" id="maPager" hidden><button id="maPrev">◀ Prev</button><span id="maPage"></span><button id="maNext">Next ▶</button></div>
+      <p class="wl-note">Songs from <a href="https://modarchive.org/" target="_blank" rel="noopener">The Mod Archive</a>. Only .MOD files with up to 8 channels open here.</p>
+    </div>
+
+    <div class="wl-pane" id="wl-ml" hidden>
+      <div class="wl-row">
+        <label class="fld"><span class="lbl">Format folder</span><select id="mlFmt">
+          <option value="Protracker">Protracker</option><option value="Noisetracker">Noisetracker</option>
+          <option value="Soundtracker">Soundtracker</option><option value="Startrekker AM">Startrekker</option><option value="Fasttracker">Fasttracker (6/8 ch)</option>
+        </select></label>
+        <label class="fld grow"><span class="lbl">Filter</span><input type="search" id="mlQ" placeholder="artist or file name" autocomplete="off"></label>
+      </div>
+      <div class="wl-crumbs" id="mlCrumbs"></div>
+      <div class="wl-list" id="mlList" role="listbox" aria-label="Modland folder"></div>
+      <div class="wl-row">
+        <label class="fld grow"><span class="lbl">Or paste a Modland file link</span><input type="text" id="mlUrl" placeholder="https://ftp.modland.com/pub/modules/Protracker/…/song.mod" autocomplete="off" spellcheck="false"></label>
+        <button id="mlLoad">Load</button>
+      </div>
+      <p class="wl-note">Files from <a href="https://ftp.modland.com/pub/modules/" target="_blank" rel="noopener">Modland</a>.</p>
+    </div>
+
+    <div class="wl-pane" id="wl-amp" hidden>
+      <div class="wl-row">
+        <label class="fld grow"><span class="lbl">AMP download link or module index</span><input type="text" id="ampId" placeholder="amp.dascene.net/downmod.php?index=12345 or 12345" autocomplete="off" spellcheck="false"></label>
+        <button id="ampLoad">Load</button>
+      </div>
+      <p class="wl-note">Find a song with <a href="https://amp.dascene.net/" target="_blank" rel="noopener">AMP's search</a>, copy its download link, and paste it here. AMP stores most songs gzipped; RETRO//TRACK unpacks them. Music from <b>Amiga Music Preservation</b> (amp.dascene.net).</p>
+    </div>
+
+    <div class="wl-status" id="wlStatus" role="status" aria-live="polite"></div>
+    <div class="wl-fallback" id="wlFallback" hidden></div>
   </section>
 </div>
 
@@ -1361,6 +1465,7 @@ function blockOp(op, arg) {
 /* ================================================================ keyboard */
 const heldNotes = new Set();
 document.addEventListener('keydown', ev => {
+  if (!$('wl').hidden) return; // the web loader popup owns the keyboard while open
   const tag = ev.target.tagName;
   if ((tag === 'INPUT' && ev.target.type !== 'range') || tag === 'SELECT' || tag === 'TEXTAREA') return;
   if (handleKey(ev.code, ev.key, ev.shiftKey, ev.ctrlKey || ev.metaKey, ev.altKey, ev.repeat)) ev.preventDefault();
@@ -1377,6 +1482,7 @@ function handleKey(code, key, shift, ctrl, alt, repeat) {
     if (k === 'c') { blockOp('copy'); return true; }
     if (k === 'x') { blockOp('cut'); return true; }
     if (k === 'v') { blockOp('paste'); return true; }
+    if (k === 'o') { openWeb(); return true; }
     if (k === 'a') { ed.sel = { r0: 0, r1: 63, c0: 0, c1: song.channels - 1 }; drawPattern(); return true; }
     if (code === 'ArrowUp') { blockOp('transpose', shift ? 12 : 1); return true; }
     if (code === 'ArrowDown') { blockOp('transpose', shift ? -12 : -1); return true; }
@@ -1646,7 +1752,15 @@ $('fWav').addEventListener('click', async () => {
 $('fOpen').addEventListener('click', () => $('fMod').click());
 $('fMod').addEventListener('change', e => { const f = e.target.files[0]; if (f) openMod(f); e.target.value = ''; });
 async function openMod(f) {
-  try { const s = T.loadMOD(await f.arrayBuffer()); setSong(s, `Loaded ${f.name}: ${s.channels} channels, ${T.numPatterns(s)} patterns, ${s.length} positions`); autosave(); }
+  try {
+    let u8 = new Uint8Array(await f.arrayBuffer()), name = f.name;
+    if (u8[0] === 0x1f && u8[1] === 0x8b) { u8 = await inflate(u8, 'gzip'); name = name.replace(/\.gz$/i, ''); }
+    if (u8[0] === 0x50 && u8[1] === 0x4b && u8[2] === 3 && u8[3] === 4) { const z = await unzipFirst(u8); u8 = z.bytes; name = z.name; }
+    const other = otherFormat(u8);
+    if (other) { msg(`${name} is ${other}. RETRO//TRACK opens ProTracker-style .MOD files.`); return; }
+    const s = T.loadMOD(u8.slice().buffer);
+    setSong(s, `Loaded ${name}: ${s.channels} channels, ${T.numPatterns(s)} patterns, ${s.length} positions`); autosave();
+  }
   catch (err) { msg(`${f.name} isn't a MOD this tracker can read: ${err.message}`); }
 }
 $('fNew').addEventListener('click', () => {
@@ -1659,8 +1773,287 @@ $('fDemo').addEventListener('click', () => { setSong(T.demoSong(), 'Demo loaded.
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => {
   e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
-  if (/\.(mod|nst|m15|stk)$/i.test(f.name) || /^mod\./i.test(f.name)) openMod(f); else importAudio(f);
+  if (/\.(mod|nst|m15|stk|gz|zip)$/i.test(f.name) || /^mod\./i.test(f.name)) openMod(f); else importAudio(f);
 });
+
+
+/* ================================================================ web loader (Mod Archive · Modland · AMP) */
+const WL = { src: 'ma', busy: null, maPage: 1, maPages: 1, maQuery: '', mlPath: [], mlCache: new Map() };
+const MA_DL = id => `https://api.modarchive.org/downloads.php?moduleid=${id}`;
+const MA_API = 'https://api.modarchive.org/xml-tools.php';
+const ML_ROOT = 'https://ftp.modland.com/pub/modules/';
+const AMP_DL = n => `https://amp.dascene.net/downmod.php?index=${n}`;
+let maKey = ''; try { maKey = localStorage.getItem('retrotrack.maKey') || ''; } catch (e) {}
+
+class WebError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
+
+function wlStatus(text, err) { const el = $('wlStatus'); el.textContent = text || ''; el.classList.toggle('err', !!err); }
+function wlFallback(url, label) {
+  const el = $('wlFallback');
+  if (!url) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false; el.textContent = '';
+  const t = document.createElement('span'); t.textContent = 'Get it from the site instead, then drop the file onto the tracker:';
+  const a = document.createElement('a'); a.className = 'btn'; a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label || 'Open download ↗';
+  el.append(t, a);
+}
+function openWeb() {
+  $('wl').hidden = false;
+  $('wlClaude').hidden = !inClaude;
+  $('maKey').value = maKey;
+  if (!maKey) $('maKeyBox').open = false;
+  setWlSrc(WL.src);
+  setTimeout(() => { const f = { ma: 'maId', ml: 'mlQ', amp: 'ampId' }[WL.src]; $(f).focus(); }, 0);
+}
+function closeWeb() { $('wl').hidden = true; if (WL.busy) WL.busy.abort(); WL.busy = null; pc.focus({ preventScroll: true }); }
+function setWlSrc(src) {
+  WL.src = src;
+  document.querySelectorAll('[data-src]').forEach(b => b.classList.toggle('on', b.dataset.src === src));
+  for (const k of ['ma', 'ml', 'amp']) $('wl-' + k).hidden = k !== src;
+  wlStatus(''); wlFallback(null);
+  if (src === 'ml' && !$('mlList').childElementCount) mlOpen([]);
+}
+$('fWeb').addEventListener('click', openWeb);
+$('bWeb').addEventListener('click', openWeb);
+$('wlClose').addEventListener('click', closeWeb);
+$('wl').addEventListener('pointerdown', e => { if (e.target === $('wl')) closeWeb(); });
+$('wl').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeWeb(); } });
+document.querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => setWlSrc(b.dataset.src)));
+
+async function wlFetch(url, what) {
+  if (WL.busy) WL.busy.abort();
+  const ctl = WL.busy = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 30000);
+  let r;
+  try { r = await fetch(url, { signal: ctl.signal, credentials: 'omit' }); }
+  catch (e) {
+    if (ctl.signal.aborted && WL.busy !== ctl) throw new WebError('cancel', 'Cancelled');
+    throw new WebError('blocked', ctl.signal.aborted ? `${what} took too long to answer.` : `${what} didn't allow this page to fetch the file directly.`);
+  } finally { clearTimeout(timer); }
+  if (WL.busy === ctl) WL.busy = null;
+  if (r.status === 404) throw new WebError('http', `${what} has no file at that address (404).`);
+  if (!r.ok) throw new WebError('http', `${what} answered with an error (${r.status}).`);
+  return r;
+}
+
+/* ---- unpacking and format checks */
+async function inflate(bytes, fmt) {
+  if (typeof DecompressionStream === 'undefined') throw new WebError('unpack', 'This browser can\'t unpack compressed files. Download the file and unpack it first.');
+  const out = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream(fmt))).arrayBuffer();
+  return new Uint8Array(out);
+}
+async function unzipFirst(u8) {
+  // read the central directory and take the first file that looks like a module
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new WebError('unpack', 'The zip file is damaged.');
+  let p = dv.getUint32(eocd + 16, true); const n = dv.getUint16(eocd + 10, true);
+  const entries = [];
+  for (let k = 0; k < n && p + 46 <= u8.length; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true);
+    const elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+    entries.push({ method, csize, name, lho }); p += 46 + nlen + elen + clen;
+  }
+  const pick = entries.find(e => /(^|\/)mod\.|\.(mod|nst|stk|m15)$/i.test(e.name)) || entries.find(e => !e.name.endsWith('/'));
+  if (!pick) throw new WebError('unpack', 'The zip file is empty.');
+  const l = pick.lho, start = l + 30 + dv.getUint16(l + 26, true) + dv.getUint16(l + 28, true);
+  const data = u8.subarray(start, start + pick.csize);
+  if (pick.method === 0) return { bytes: data.slice(), name: pick.name.split('/').pop() };
+  if (pick.method === 8) return { bytes: await inflate(data, 'deflate-raw'), name: pick.name.split('/').pop() };
+  throw new WebError('unpack', 'The zip file uses a compression method this page can\'t read.');
+}
+function otherFormat(u8) {
+  const s = (o, n) => String.fromCharCode(...u8.subarray(o, o + n));
+  if (s(0, 17) === 'Extended Module: ') return 'an XM (FastTracker 2) module';
+  if (u8.length > 48 && s(44, 4) === 'SCRM') return 'an S3M (Scream Tracker 3) module';
+  if (s(0, 4) === 'IMPM') return 'an IT (Impulse Tracker) module';
+  if (s(0, 4) === 'MTM\x10') return 'an MTM module';
+  if (s(0, 4) === 'PP20') return 'a PowerPacker-crunched file, which needs unpacking on an Amiga tool first';
+  if (s(0, 4) === 'MMD0' || s(0, 4) === 'MMD1' || s(0, 4) === 'MMD2' || s(0, 4) === 'MMD3') return 'an OctaMED module';
+  if (s(0, 4) === 'Rar!' || s(0, 2) === '7z') return 'an archive this page can\'t unpack';
+  return null;
+}
+async function loadRemote(url, what, label, nameHint, fallbackUrl) {
+  wlFallback(null);
+  wlStatus(`Downloading from ${what}…`);
+  try {
+    const r = await wlFetch(url, what);
+    let u8 = new Uint8Array(await r.arrayBuffer());
+    let name = nameHint || '';
+    const cd = r.headers.get('content-disposition') || '';
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i); if (m) name = decodeURIComponent(m[1]);
+    if (u8[0] === 0x1f && u8[1] === 0x8b) { wlStatus('Unpacking gzip…'); u8 = await inflate(u8, 'gzip'); name = name.replace(/\.gz$/i, ''); }
+    if (u8[0] === 0x50 && u8[1] === 0x4b && u8[2] === 3 && u8[3] === 4) { wlStatus('Unpacking zip…'); const z = await unzipFirst(u8); u8 = z.bytes; name = z.name; }
+    if (u8.length < 600 && /<html|<!doctype/i.test(new TextDecoder().decode(u8.subarray(0, 200)))) throw new WebError('http', `${what} sent a web page instead of a module. The link may need a visit to the site first.`);
+    const other = otherFormat(u8);
+    if (other) throw new WebError('format', `${name || 'That file'} is ${other}. RETRO//TRACK opens ProTracker-style .MOD files.`);
+    let s;
+    try { s = T.loadMOD(u8.buffer.byteLength === u8.length ? u8.buffer : u8.slice().buffer); }
+    catch (e) { throw new WebError('format', `${name || 'That file'} isn't a MOD this tracker can read: ${e.message}`); }
+    setSong(s, `Loaded ${name || s.title || 'module'} from ${label}: ${s.channels} channels, ${T.numPatterns(s)} patterns`);
+    autosave();
+    wlStatus(`Loaded ${name || s.title}.`);
+    closeWeb();
+  } catch (e) {
+    if (e.kind === 'cancel') return;
+    wlStatus(e.message || String(e), true);
+    if (e.kind === 'blocked' || e.kind === 'http') wlFallback(fallbackUrl || url);
+  }
+}
+
+/* ---- The Mod Archive */
+function maParseId(text) {
+  const t = text.trim();
+  const m = t.match(/moduleid=(\d+)/i) || t.match(/[?&]query=(\d+)/i) || t.match(/module\.php\?(\d+)/i) || t.match(/^#?(\d{1,7})$/);
+  return m ? +m[1] : 0;
+}
+$('maLoad').addEventListener('click', () => {
+  const id = maParseId($('maId').value);
+  if (!id) { wlStatus('Paste a Mod Archive module link (it contains moduleid=… or query=…) or type the module number.', true); return; }
+  loadRemote(MA_DL(id), 'The Mod Archive', 'The Mod Archive', '', `https://modarchive.org/index.php?request=view_by_moduleid&query=${id}`);
+});
+$('maId').addEventListener('keydown', e => { if (e.key === 'Enter') $('maLoad').click(); });
+$('maKeySave').addEventListener('click', () => {
+  maKey = $('maKey').value.trim();
+  try { if (maKey) localStorage.setItem('retrotrack.maKey', maKey); else localStorage.removeItem('retrotrack.maKey'); } catch (e) {}
+  wlStatus(maKey ? 'Key saved in this browser.' : 'Key removed.');
+});
+async function maSearch(page) {
+  const q = $('maQ').value.trim();
+  if (!q) { wlStatus('Type something to search for.', true); return; }
+  if (!maKey) { $('maKeyBox').open = true; wlStatus('Searching needs a Mod Archive API key. Paste it into the API key box, or load a song by link or ID.', true); $('maKey').focus(); return; }
+  WL.maQuery = q; WL.maPage = page;
+  wlFallback(null); wlStatus(`Searching for “${q}”…`);
+  const url = `${MA_API}?key=${encodeURIComponent(maKey)}&request=search&type=filename_or_songtitle&query=${encodeURIComponent(q)}&page=${page}`;
+  try {
+    const r = await wlFetch(url, 'The Mod Archive search');
+    const doc = new DOMParser().parseFromString(await r.text(), 'application/xml');
+    if (doc.querySelector('parsererror')) throw new WebError('http', 'The Mod Archive search sent something unexpected. Check your API key.');
+    const errTxt = doc.querySelector('error'); if (errTxt) throw new WebError('http', 'The Mod Archive: ' + errTxt.textContent.trim());
+    const txt = (el, sel) => { const n = el.querySelector(sel); return n ? n.textContent.trim() : ''; };
+    const mods = [...doc.querySelectorAll('module')].map(m => ({
+      id: +txt(m, 'id'), file: txt(m, 'filename'), title: txt(m, 'songtitle'), fmt: txt(m, 'format').toUpperCase(),
+      size: +txt(m, 'bytes') || 0, artist: txt(m, 'artist_info alias') || txt(m, 'artist_info guessed') || ''
+    })).filter(m => m.id);
+    WL.maPages = Math.max(1, +txt(doc, 'totalpages') || 1);
+    const list = $('maList'); list.textContent = '';
+    for (const m of mods) {
+      const ok = m.fmt === 'MOD' || /\.mod$/i.test(m.file);
+      const b = document.createElement('button'); b.className = 'wl-item' + (ok ? '' : ' off'); b.type = 'button';
+      b.innerHTML = '<span class="t"></span><span class="m"></span><span class="s"></span>';
+      b.children[0].textContent = m.title || m.file;
+      b.children[1].textContent = `${m.fmt || '?'}${m.size ? ' · ' + Math.round(m.size / 1024) + ' KB' : ''}`;
+      b.children[2].textContent = [m.file, m.artist && 'by ' + m.artist, '#' + m.id].filter(Boolean).join('  ·  ');
+      b.title = ok ? 'Load this module' : `${m.fmt} files don't open in RETRO//TRACK`;
+      if (ok) b.addEventListener('click', () => loadRemote(MA_DL(m.id), 'The Mod Archive', 'The Mod Archive', m.file, `https://modarchive.org/index.php?request=view_by_moduleid&query=${m.id}`));
+      list.append(b);
+    }
+    $('maPager').hidden = WL.maPages <= 1;
+    $('maPage').textContent = `page ${page} of ${WL.maPages}`;
+    $('maPrev').disabled = page <= 1; $('maNext').disabled = page >= WL.maPages;
+    const usable = mods.filter(m => m.fmt === 'MOD' || /\.mod$/i.test(m.file)).length;
+    wlStatus(mods.length ? `${mods.length} results on this page, ${usable} playable here. Tap one to load it.` : `Nothing found for “${q}”.`);
+  } catch (e) {
+    if (e.kind === 'cancel') return;
+    wlStatus(e.message, true);
+    if (e.kind === 'blocked') wlFallback(`https://modarchive.org/index.php?request=search&query=${encodeURIComponent(q)}&submit=Find&search_type=filename_or_songtitle`, 'Search on modarchive.org ↗');
+  }
+}
+$('maGo').addEventListener('click', () => maSearch(1));
+$('maQ').addEventListener('keydown', e => { if (e.key === 'Enter') maSearch(1); });
+$('maPrev').addEventListener('click', () => maSearch(Math.max(1, WL.maPage - 1)));
+$('maNext').addEventListener('click', () => maSearch(WL.maPage + 1));
+
+/* ---- Modland: browse the directory listings */
+function mlUrl(path, dir) { return ML_ROOT + path.map(encodeURIComponent).join('/') + (dir ? '/' : ''); }
+function mlParse(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const out = [];
+  for (const a of doc.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href');
+    if (!href || href.startsWith('?') || href.startsWith('/') || href.startsWith('..') || /^[a-z]+:/i.test(href)) continue;
+    const dir = href.endsWith('/');
+    let name; try { name = decodeURIComponent(href.replace(/\/$/, '')); } catch (e) { name = href; }
+    if (!name || name === '.') continue;
+    let size = '';
+    const row = a.closest('tr'); const tail = row ? row.textContent : (a.nextSibling && a.nextSibling.textContent) || '';
+    const sm = tail.replace(a.textContent, '').match(/(\d+(?:\.\d+)?[KMG]?)\s*$/); if (!dir && sm) size = sm[1];
+    out.push({ name, dir, size });
+  }
+  return out;
+}
+async function mlOpen(sub) {
+  const path = [$('mlFmt').value, ...sub];
+  WL.mlPath = sub;
+  renderCrumbs();
+  const key = path.join('/');
+  wlFallback(null);
+  let items = WL.mlCache.get(key);
+  if (!items) {
+    $('mlList').textContent = '';
+    wlStatus(`Reading Modland ${path.join(' / ')}…`);
+    try {
+      const r = await wlFetch(mlUrl(path, true), 'Modland');
+      items = mlParse(await r.text());
+      WL.mlCache.set(key, items);
+    } catch (e) {
+      if (e.kind === 'cancel') return;
+      wlStatus(e.message, true); if (e.kind !== 'format') wlFallback(mlUrl(path, true), 'Browse Modland ↗');
+      return;
+    }
+  }
+  renderMl(items);
+}
+function renderCrumbs() {
+  const el = $('mlCrumbs'); el.textContent = '';
+  const parts = [$('mlFmt').value, ...WL.mlPath];
+  parts.forEach((p, i) => {
+    if (i) el.append(' / ');
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = p;
+    b.addEventListener('click', () => { $('mlQ').value = ''; mlOpen(WL.mlPath.slice(0, i)); });
+    el.append(b);
+  });
+}
+function renderMl(items) {
+  const q = $('mlQ').value.trim().toLowerCase();
+  const shown = items.filter(it => !q || it.name.toLowerCase().includes(q));
+  const list = $('mlList'); list.textContent = '';
+  const frag = document.createDocumentFragment();
+  for (const it of shown.slice(0, 600)) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'wl-item' + (it.dir ? ' dir' : '');
+    b.innerHTML = '<span class="t"></span><span class="m"></span>';
+    b.children[0].textContent = it.dir ? it.name + ' /' : it.name;
+    b.children[1].textContent = it.dir ? 'folder' : it.size;
+    b.addEventListener('click', () => {
+      if (it.dir) { $('mlQ').value = ''; mlOpen([...WL.mlPath, it.name]); }
+      else { const p = [$('mlFmt').value, ...WL.mlPath, it.name]; loadRemote(mlUrl(p, false), 'Modland', 'Modland', it.name); }
+    });
+    frag.append(b);
+  }
+  list.append(frag);
+  const dirs = items.filter(i => i.dir).length, files = items.length - dirs;
+  wlStatus(`${shown.length < items.length ? `${shown.length} of ` : ''}${items.length} entries${dirs && files ? ` (${dirs} folders, ${files} files)` : ''}${shown.length > 600 ? '. Showing the first 600; type to filter.' : '.'}`);
+}
+$('mlFmt').addEventListener('input', () => { $('mlQ').value = ''; mlOpen([]); });
+$('mlQ').addEventListener('input', () => { const it = WL.mlCache.get([$('mlFmt').value, ...WL.mlPath].join('/')); if (it) renderMl(it); });
+$('mlLoad').addEventListener('click', () => {
+  const u = $('mlUrl').value.trim();
+  if (!/^https?:\/\/(ftp\.)?modland\.com\//i.test(u)) { wlStatus('Paste a link that starts with https://ftp.modland.com/', true); return; }
+  loadRemote(u.replace(/^http:/i, 'https:'), 'Modland', 'Modland', decodeURIComponent(u.split('/').pop()));
+});
+$('mlUrl').addEventListener('keydown', e => { if (e.key === 'Enter') $('mlLoad').click(); });
+
+/* ---- AMP */
+$('ampLoad').addEventListener('click', () => {
+  const t = $('ampId').value.trim();
+  const m = t.match(/index=(\d+)/i) || t.match(/^(\d{1,7})$/);
+  if (m) { loadRemote(AMP_DL(m[1]), 'AMP', 'Amiga Music Preservation (AMP)', '', AMP_DL(m[1])); return; }
+  if (/^https?:\/\/(www\.)?amp\.dascene\.net\//i.test(t)) { loadRemote(t.replace(/^http:/i, 'https:'), 'AMP', 'Amiga Music Preservation (AMP)', decodeURIComponent(t.split(/[/?]/).pop())); return; }
+  wlStatus('Paste an AMP download link (it contains downmod.php?index=…) or type the module index number.', true);
+});
+$('ampId').addEventListener('keydown', e => { if (e.key === 'Enter') $('ampLoad').click(); });
 
 /* ================================================================ scopes */
 const scv = $('scopes'), scx = scv.getContext('2d');
