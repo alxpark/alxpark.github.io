@@ -69,6 +69,17 @@ header.top{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding-b
 :root[data-lay="phone"] .wrap{max-width:720px}
 :root[data-lay="phone"] .rivals{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(112px,1fr);overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 :root[data-lay="phone"] .rivals::-webkit-scrollbar{display:none}
+/* 촘촘한 상인 칸: 모든 상인이 한 줄에 */
+:root[data-lay="phone"] .rivals.dense{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(var(--n),minmax(0,1fr));overflow:visible}
+.rivals.dense .rival{padding:6px 6px 5px;gap:4px}
+.rivals.dense .rival .nm{gap:4px}
+.rivals.dense .rival .nm span:first-child{font-size:13px}
+.rivals.dense .rival .pts{font-size:18px}
+.rivals.dense .bgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px}
+.rivals.dense .bgrid span{height:17px;border-radius:3px;display:grid;place-items:center;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+.rivals.dense .bgrid span.zero{background:rgba(255,255,255,.04);color:var(--text-dim);font-weight:400;box-shadow:inset 0 0 0 1.5px var(--gc)}
+.rivals.dense .bgrid span.zero[style*="--g4e"]{box-shadow:inset 0 0 0 1.5px #8a8494}
+.rivals.dense .mini{font-size:10.5px;gap:2px 4px;justify-content:space-between;flex-wrap:nowrap;white-space:nowrap}
 @media (max-width:480px){.round{order:9;width:100%;margin:-4px 0 0;text-align:left;font-size:12px}header.top .btn.small{padding:0 10px}#coachBtn{margin-left:auto}}
 :root[data-lay="wide2"] .wrap{max-width:1180px}
 :root[data-lay="wide2"] .layout{grid-template-columns:minmax(0,1fr) minmax(320px,400px);grid-template-areas:"board rivals" "board coach" "board seat";grid-template-rows:auto auto 1fr;align-items:start}
@@ -279,7 +290,8 @@ button.patron{font:inherit;color:inherit;cursor:pointer;text-align:center}
 .bchip{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;font-size:calc(12px * var(--t));font-weight:700;vertical-align:1px;white-space:nowrap}
 :root{--good:#6cc38f;--ok:#b7a5bd;--meh:#e3a35a;--bad:#e0727e}
 .coach{border:1px solid var(--brass-soft);border-radius:14px;padding:12px 14px;margin-bottom:16px;background:linear-gradient(135deg,rgba(210,170,85,.10),rgba(0,0,0,.15));display:grid;gap:10px}
-.coach-head{display:flex;align-items:center;gap:8px}
+.coach-head{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap}
+.coach-head h2,.coach-head .stage{white-space:nowrap}
 .coach-head h2{margin:0;font-family:var(--f-title);font-size:calc(16px * var(--t));color:var(--brass)}
 .coach-head .stage{font-size:calc(12px * var(--t));color:var(--text-dim)}
 
@@ -513,9 +525,20 @@ const myTurn = () => st.phase!=='over' && !st.players[st.cur].ai && st.cur===vie
 function render(){
   $('round').textContent = `라운드 ${st.turn}${st.final?' · 마지막':''}`;
   // 상인 줄
-  $('rivals').innerHTML = st.players.map((p,i)=>{
+  // 폰 세로처럼 칸이 좁으면 모든 상인이 한 줄에 들어가는 촘촘한 칸으로
+  const n = st.players.length, rv = $('rivals');
+  const rowW = rv.clientWidth || (innerWidth - 32);
+  const dense = document.documentElement.dataset.lay === 'phone' && (rowW - (n-1)*6) / n < 118;
+  rv.classList.toggle('dense', dense);
+  rv.style.setProperty('--n', n);
+  rv.innerHTML = st.players.map((p,i)=>{
     const tok = p.tokens.reduce((a,b)=>a+b,0);
-    return `<button type="button" data-act="pl${i}" class="rival ${i===st.cur&&st.phase!=='over'?'on':''}" aria-label="${names[i]}, ${p.pts}점. 눌러서 자세히 보기">
+    const label = `${names[i]}, ${p.pts}점, 토큰 ${tok}개, 예약 ${p.reserved.length}장. 눌러서 자세히 보기`;
+    if (dense) return `<button type="button" data-act="pl${i}" class="rival ${i===st.cur&&st.phase!=='over'?'on':''}" aria-label="${label}">
+      <div class="nm"><span>${names[i]}</span><span class="pts">${p.pts}</span></div>
+      <div class="bgrid">${p.bonus.map((b,c)=>`<span style="${b?chipCol(c):`--gc:var(--g${c===4?'4e':c})`}" class="${b?'':'zero'}" title="${GEM[c]} 보너스 ${b}">${b}</span>`).join('')}</div>
+      <div class="mini"><i>토큰${tok}</i><i>예약${p.reserved.length}</i></div></button>`;
+    return `<button type="button" data-act="pl${i}" class="rival ${i===st.cur&&st.phase!=='over'?'on':''}" aria-label="${label}">
       <div class="nm"><span>${names[i]}</span><em>${p.ai?'AI':'사람'}</em><span class="pts">${p.pts}</span></div>
       <div class="mini">${p.bonus.map((b,c)=>`<i>${gem(c)}${b}</i>`).join('')}</div>
       <div class="mini"><i>토큰 ${tok}</i><i>예약 ${p.reserved.length}</i>${p.nobles.length?`<i>후원 ${p.nobles.length}</i>`:''}</div></button>`;
