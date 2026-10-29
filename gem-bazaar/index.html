@@ -223,7 +223,8 @@ button.patron{font:inherit;color:inherit;cursor:pointer;text-align:center}
 .legend span{color:var(--brass)}
 .reserved{display:grid;grid-template-columns:repeat(3,minmax(0,84px));gap:8px}
 .reserved .empty{aspect-ratio:5/7;border:1px dashed rgba(255,255,255,.12);border-radius:8px;display:grid;place-items:center;color:var(--text-dim);font-size:calc(11px * var(--t))}
-.won-nobles{display:flex;gap:6px;flex-wrap:wrap}
+.won-nobles{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,78px));gap:6px}
+.won-nobles .patron .req span{width:15px;height:18px;font-size:11px}
 .log{display:grid;gap:4px;font-size:calc(12.5px * var(--t));color:var(--text-dim);max-height:150px;overflow:auto;margin:0;padding:0;list-style:none}
 .log li b{color:var(--text);font-weight:700}
 
@@ -550,7 +551,7 @@ function renderSeat(){
       <p class="legend" style="margin:8px 0 0">큰 숫자는 토큰, <span>+숫자</span>는 그 색 카드 수(보너스, 영구 할인)예요. 금은 아무 색으로나 쓸 수 있어요.</p>
     </div>
     <div><p class="label">예약 카드 <b>최대 3장</b></p><div class="reserved">${res}</div></div>
-    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(id=>`<button type="button" data-act="pat${id}" class="patron" style="width:60px" title="${PATRONS[id].name}">${portrait({id, req:nobleReq(id)})}<span class="pv">3</span><span class="pn">${PATRONS[id].name}</span></button>`).join('')}</div></div>`:''}
+    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(wonNobleHTML).join('')}</div></div>`:''}
     <div><p class="label">기록</p><ul class="log">${st.log.slice(-12).reverse().map(e=>`<li>${describe(e)}</li>`).join('') || '<li>첫 수를 기다리는 중</li>'}</ul></div>
   </section>`;
 }
@@ -841,13 +842,15 @@ function playerSheet(i){
     <p class="devinfo">산 카드 1장은 그 색 보석을 영구히 1개 깎아 줘요. 이게 <b style="color:var(--text)">보너스</b>예요. 구매력 = 보너스 + 토큰이고, 금은 아무 색에나 보태요.</p>
     ${ownedHTML(p)}
     ${coachLine}
-    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(id=>`<button type="button" data-act="pat${id}" class="patron" style="width:64px">${portrait({id,req:nobleReq(id)})}<span class="pv">3</span><span class="pn">${PATRONS[id].name}</span></button>`).join('')}</div></div>`:''}
+    ${p.nobles.length?`<div><p class="label">모신 후원자</p><div class="won-nobles">${p.nobles.map(wonNobleHTML).join('')}</div></div>`:''}
     ${near.length?`<div><p class="label">후원자까지</p><div class="near">${near.map(({n,need})=>`<button type="button" class="near-row" data-act="pat${n.id}"><span>${PATRONS[n.id].name}</span><span class="bars">${n.req.map((v,c)=>v?bar(Math.min(p.bonus[c],v),v,c):'').join('')}</span><span class="left">${need?need+'개':'완료'}</span></button>`).join('')}</div></div>`:''}
     ${p.reserved.length?`<div><p class="label">예약 카드 <b>${me?'':'덱에서 몰래 예약한 카드는 뒷면'}</b></p><div class="reserved">${resHTML}</div></div>`:''}
     <div><p class="label">지금 살 수 있는 카드 <b>${afford.length}장</b></p><p class="devinfo">${afford.length ? afford.slice(0,5).map(cardShortName).join(', ') : '없어요'}</p></div>
     ${recent.length?`<div><p class="label">최근 행동</p><ul class="log">${recent.map(e=>`<li>${describe(e)}</li>`).join('')}</ul></div>`:''}
     <button class="btn solid" type="button" data-act="close">닫기</button>`);
 }
+/* 모신 후원자: 초상화·이름·조건 보석(채운 보너스)까지 */
+const wonNobleHTML = id => nobleHTML({id, req:nobleReq(id)}, true, 'button');
 const cardShortName = k => `${GEM[k.c]} ${k.p}점(${TIER[k.t]})`;
 /* 보유 카드: 색별로 겹쳐 쌓기 (실제 테이블처럼 윗부분만 보이게) */
 function ownedHTML(p){
