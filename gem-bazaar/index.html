@@ -316,7 +316,7 @@ details.more[open] summary{margin-bottom:8px}
 /* 추천 표시: 돌아가는 무지개 테두리 + 색이 바뀌는 빛 */
 @property --rec-ang{syntax:'<angle>';inherits:false;initial-value:0deg}
 :root{--rainbow:#ff4d5e,#ff9a3c,#ffd84a,#5fd36a,#3cc4ff,#6a6bff,#c55cff,#ff4d5e}
-.rec-ring{position:absolute;inset:0;border-radius:inherit;padding:3px;z-index:4;pointer-events:none;
+.rec-ring{position:absolute;inset:0;border-radius:inherit;padding:3px;z-index:3;pointer-events:none;
   background:conic-gradient(from var(--rec-ang),var(--rainbow));
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
@@ -333,6 +333,12 @@ details.more[open] summary{margin-bottom:8px}
 .card.rec{outline:none}
 .card .rec-ring{padding:3.5px}
 @keyframes rec-spin{to{--rec-ang:360deg}}
+/* 숫자·표시는 항상 추천 테두리 위에 */
+.card .p,.card .bonus,.card .cost,.card .tier-mark,.card .vbadge,.card.can::after{z-index:5}
+.coin .n,.coin .s{z-index:6}
+.coin > svg{position:relative;z-index:5}
+.deck .tn,.deck .cnt{position:relative;z-index:5}
+.purse .cell > svg,.purse .cell > .v{position:relative;z-index:5}
 @keyframes rec-glow{
   0%,100%{filter:drop-shadow(0 0 5px #ff4d5e) drop-shadow(0 0 2px #ff4d5e)}
   17%{filter:drop-shadow(0 0 5px #ff9a3c) drop-shadow(0 0 2px #ff9a3c)}
