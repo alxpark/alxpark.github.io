@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>샌드스톰 랠리 — WASM 카드 게임</title>
+<style>
+:root{
+  --sand:#f3e6cf; --sand2:#e8d4b0; --ink:#2b2118; --muted:#7a6650;
+  --me:#1f7a72; --me-l:#d5efe9; --ai:#b4492a; --ai-l:#f7ddd2;
+  --gold:#d99a20; --card:#fffaf1; --line:#d9c4a0;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--sand);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR","Segoe UI",sans-serif}
+body{min-height:100vh;display:flex;justify-content:center}
+#app{width:100%;max-width:480px;padding:12px 12px 210px;position:relative}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+h1{font-size:19px;margin:0;letter-spacing:-.3px}
+h1 small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:0}
+.btn{white-space:nowrap;border:0;border-radius:10px;padding:9px 12px;font:600 14px inherit;font-family:inherit;background:var(--ink);color:var(--sand);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink)}
+.btn:disabled{opacity:.3;cursor:default}
+.status{margin:10px 0 8px;display:flex;gap:8px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;font-size:13px}
+.turn{font-weight:700}
+.turn.me{color:var(--me)} .turn.ai{color:var(--ai)}
+.pips{display:flex;gap:4px}
+.pip{width:12px;height:12px;border-radius:50%;border:2px solid var(--gold)}
+.pip.on{background:var(--gold)}
+.meta{color:var(--muted);font-size:12px;text-align:right;line-height:1.35}
+.aihand{display:flex;gap:3px;justify-content:flex-end}
+.aihand i{width:10px;height:14px;border-radius:2px;background:var(--ai);display:inline-block}
+.road{position:relative;border-radius:14px;padding:8px 8px 0;background:repeating-linear-gradient(180deg,#e9d6b3 0 22px,#e3cda5 22px 44px);border:1px solid var(--line);overflow:hidden}
+.flag{text-align:center;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:2px;padding:2px 0 6px}
+.car{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:8px 10px;margin-bottom:7px;border:2px solid transparent;position:relative;transition:transform .2s, box-shadow .2s;cursor:pointer}
+.car.o0{border-left:7px solid var(--me)} .car.o1{border-left:7px solid var(--ai)}
+.car.o0 .ic{background:var(--me-l);color:var(--me)} .car.o1 .ic{background:var(--ai-l);color:var(--ai)}
+.car.sel{border-color:var(--gold);box-shadow:0 0 0 3px rgba(217,154,32,.3);transform:scale(1.02)}
+.car.tgt{border-color:var(--ai);animation:pulse 1s infinite}
+.car.flash{animation:flash .6s}
+.car.used .ic{opacity:.45}
+.car .ic{width:44px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+.car .ic svg{width:38px;height:28px}
+.car .tx{flex:1;min-width:0}
+.car .nm{font-weight:700;font-size:14px;display:flex;gap:6px;align-items:center}
+.car .ds{font-size:11.5px;color:var(--muted);line-height:1.3}
+.car .pos{font-size:11px;color:var(--muted);width:22px;text-align:center;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;font-weight:700;border-radius:6px;padding:1px 5px;background:var(--sand2);color:var(--ink)}
+.tag.who0{background:var(--me);color:#fff} .tag.who1{background:var(--ai);color:#fff}
+.storm{height:58px;margin:0 -8px;position:relative;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:3px;color:#fff8e8;font-size:13px;
+  background:linear-gradient(180deg,rgba(150,105,55,.0),rgba(150,105,55,.85) 45%,#7a5530);overflow:hidden}
+.storm:before{content:"";position:absolute;inset:-40px;background:repeating-linear-gradient(115deg,transparent 0 14px,rgba(255,240,210,.18) 14px 18px);animation:wind 1.2s linear infinite}
+.storm.hit{animation:shake .5s}
+.storm span{position:relative}
+@keyframes wind{to{transform:translateX(36px)}}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(180,73,42,.3)}}
+@keyframes flash{0%{background:#fff3c4}100%{background:var(--card)}}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.log{margin-top:10px;font-size:12.5px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;min-height:56px}
+.log div{padding:1px 0}
+.log div:first-child{color:var(--ink);font-weight:600}
+.dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none}
+.dock .in{pointer-events:auto;width:100%;max-width:480px;background:var(--ink);color:var(--sand);border-radius:18px 18px 0 0;padding:10px 12px calc(12px + env(safe-area-inset-bottom))}
+.hint{font-size:12.5px;min-height:18px;margin-bottom:8px;color:#f0dcb8}
+.hand{display:flex;gap:7px;margin-bottom:9px;min-height:62px}
+.hc{flex:1;max-width:33%;background:var(--card);color:var(--ink);border-radius:10px;padding:6px 7px;cursor:pointer;border:2px solid transparent}
+.hc.sel{border-color:var(--gold)}
+.hc .nm{font-weight:700;font-size:13px;display:flex;align-items:center;gap:5px}
+.hc .nm svg{width:24px;height:18px;color:var(--me)}
+.hc .ds{font-size:10.5px;color:var(--muted);line-height:1.25;margin-top:2px}
+.empty{font-size:12px;color:#bba98b;align-self:center}
+.row{display:flex;gap:6px}
+.row .btn{flex:1;background:#4a3a2b;color:var(--sand);padding:10px 4px;font-size:13px}
+.row .btn.pri{background:var(--gold);color:var(--ink)}
+.modal{position:fixed;inset:0;background:rgba(43,33,24,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal.show{display:flex}
+.sheet{background:var(--card);border-radius:16px;max-width:440px;width:100%;max-height:86vh;overflow:auto;padding:16px 16px 14px}
+.sheet h2{margin:0 0 8px;font-size:18px}
+.sheet p,.sheet li{font-size:13.5px;line-height:1.5}
+.sheet ul{padding-left:18px;margin:6px 0}
+.types{display:grid;grid-template-columns:1fr;gap:6px;margin:8px 0}
+.types div{display:flex;gap:8px;align-items:center;font-size:12.5px}
+.types svg{width:30px;height:22px;flex:none;color:var(--me)}
+.end h2{font-size:24px;text-align:center}
+.end p{text-align:center}
+.mode{display:flex;gap:6px;margin:10px 0}
+.mode .btn{flex:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>샌드스톰 랠리<small>WebAssembly 카드 레이스 · 모래폭풍에서 살아남기</small></h1>
+    <button class="btn ghost" id="rulesBtn">규칙</button>
+  </header>
+  <div class="status">
+    <div><div class="turn" id="turn"></div><div class="pips" id="pips"></div></div>
+    <div class="meta"><div id="deck"></div><div class="aihand" id="aihand"></div></div>
+  </div>
+  <div class="road" id="road"></div>
+  <div class="log" id="log"></div>
+</div>
+
+<div class="dock"><div class="in">
+  <div class="hint" id="hint"></div>
+  <div class="hand" id="hand"></div>
+  <div class="row" id="ctl"></div>
+</div></div>
+
+<div class="modal" id="rules"><div class="sheet">
+  <h2>규칙</h2>
+  <p>두 레이싱 팀이 일렬로 달리며 뒤에서 덮쳐오는 모래폭풍을 피합니다. <b>상대 팀 차를 모두 잃게 만들면 승리!</b></p>
+  <ul>
+    <li>차량 행렬은 위가 <b>선두</b>, 아래가 <b>후미</b>입니다.</li>
+    <li>내 턴에 <b>행동 3번</b>을 아래에서 자유롭게 씁니다.<br>· 카드 뽑기 (손패 최대 3장)<br>· 손패의 차를 <b>선두</b>에 배치<br>· 내 차를 한 칸 앞/뒤로 이동 (자리 교환)<br>· 내 차의 능력 사용 (차마다 턴당 1번)</li>
+    <li>턴이 끝나면 폭풍이 <b>맨 뒤 차량 1대</b>를 삼킵니다.</li>
+    <li>폭풍이 지나간 뒤 행렬에 차가 없는 팀이 패배합니다.</li>
+  </ul>
+  <div class="types" id="typesList"></div>
+  <p style="color:var(--muted);font-size:12px">카드 레이스 보드게임의 메커니즘에서 영감을 받은 오리지널 구현입니다. 게임 로직과 AI는 C로 작성해 WebAssembly로 컴파일했습니다.</p>
+  <button class="btn" style="width:100%" onclick="closeM('rules')">닫기</button>
+</div></div>
+
+<div class="modal" id="endM"><div class="sheet end">
+  <h2 id="endTitle"></h2><p id="endText"></p>
+  <div class="mode"><button class="btn" onclick="start(0)">다시 하기 (AI 대전)</button><button class="btn ghost" onclick="start(1)">2인 핫시트</button></div>
+</div></div>
+
+<script>
+const WASM_B64 = "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AGpBfyACIAQbOgAADAMLIAAgBUEDbGoiBCACakHkAGotAAAhBwJAIAAgBUECdGpB7ABqIgMoAgBBf2oiASACTA0AA0AgBCACaiIBQeQAaiABQeUAai0AADoAACACQQFqIgIgAygCAEF/aiIBSA0ACwsgAyABNgIAAkAgACgCYCICQQFIDQAgAEEEaiAAIAJBAnQQgYCAgAAaIAAoAmAhAgsgACACQQFqNgJgIAAgBUEIdEGA/gNxIAdyQYCAhAhyNgIADAILIAAgAkECdGoiASgCACEEIAEgAEEBQX8gAxsgAmpBAnRqIgIoAgA2AgAgAiAENgIADAELIAAgAkECdGoiAUEBOgADAkACQAJAAkACQAJAAkACQCABLQAADgkAAQIDBAUIBgcICwJAIAAoAmAiASACSg0AIAAgAUF/ajYCYAwICyACQX9qIQEgAkECdCAAakF8aiECA0AgAiACQQRqIgMoAgA2AgAgAyECIAFBAWoiASAAKAJgQX9qIgNIDQALIAAgAzYCYAwHCyAAIAMgAhCHgICAAAwGCyAAIAJBABCHgICAAAwFCyAAIAJBAWogAkEDahCHgICAAAwECyAAIAMgAyACTiACahCHgICAAAwDCwJAIAAoAmBBf2oiByADTA0AIAAgA0ECdGohASADIQQDQCABIAFBBGoiBygCADYCACAHIQEgBEEBaiIEIAAoAmBBf2oiB0gNAAsLIAAgBzYCYAJAIAdBf2oiBCACIAMgAkhrIgFMDQAgACABQQJ0aiECA0AgAiACQQRqIgMoAgA2AgAgAyECIAFBAWoiASAAKAJgQX9qIgRIDQALCyAAIAQ2AmAMAgsgACAFIAQQiICAgAAgACAFIAQQiICAgAAMAQsgAUF8aiICKAIAIQMgAiABQQRqIgEoAgA2AgAgASADNgIACwJAAkAgACgCYCIIQQFIDQAgCEEDcSEDAkACQCAIQQRPDQBBACEEQQAhAQwBCyAAQQ1qIQIgCEH8////B3EhB0EAIQRBACEBA0AgASACQXRqLQAARWogAkF4ai0AAEVqIAJBfGotAABFaiACLQAARWohASACQRBqIQIgByAEQQRqIgRHDQALCwJAIANFDQAgBEECdCAAakEBaiECA0AgASACLQAARWohASACQQRqIQIgA0F/aiIDDQALCyABDQELIAAoAmwNACAAKAKU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";
+const A = {DRAW:0, PLAY:1, MOVE:2, ABIL:3, END:4};
+const TYPES = [
+  {n:"충각차", d:"바로 앞의 적 차량을 들이받아 파괴", g:"ram"},
+  {n:"작살차", d:"앞쪽 3칸 안의 적 차량을 내 바로 뒤로 끌어옴", g:"hook", tgt:1},
+  {n:"니트로", d:"단숨에 선두로 이동", g:"nitro"},
+  {n:"오일차", d:"바로 뒤 차량을 2칸 뒤로 미끄러뜨림", g:"oil"},
+  {n:"견인차", d:"아군 차량 하나를 내 바로 뒤로 데려옴", g:"tow", tgt:1},
+  {n:"박격포", d:"선두 2칸 안에서 사용: 후방 절반의 적 1대 파괴 (사용 후 이 차도 소모)", g:"mortar", tgt:1},
+  {n:"장갑차", d:"패시브: 폭풍을 한 번 버팀", g:"armor", passive:1},
+  {n:"정찰차", d:"카드 2장 뽑기", g:"scout"},
+  {n:"연막차", d:"내 바로 앞과 바로 뒤 차량의 자리를 바꿈", g:"smoke"},
+];
+// Original simple car glyphs: a body + type mark
+function glyph(t){
+  const body = `<path d="M3 20h34v-6l-5-6H14l-5 6H3z" fill="currentColor" opacity=".9"/><circle cx="11" cy="22" r="4" fill="#2b2118"/><circle cx="29" cy="22" r="4" fill="#2b2118"/>`;
+  const marks = {
+    ram:`<path d="M37 12l3 4-3 4z" fill="#2b2118"/><path d="M37 11l3 1M37 21l3-1" stroke="#2b2118" stroke-width="1.5"/>`,
+    hook:`<path d="M30 8 Q36 2 39 6 Q40 10 36 10" fill="none" stroke="#2b2118" stroke-width="2"/>`,
+    nitro:`<path d="M1 12h6M0 16h5M1 20h4" stroke="#d99a20" stroke-width="2"/>`,
+    oil:`<ellipse cx="4" cy="26" rx="4" ry="1.6" fill="#2b2118"/>`,
+    tow:`<path d="M3 16H0" stroke="#2b2118" stroke-width="2"/><path d="M20 8V3h6" fill="none" stroke="#2b2118" stroke-width="2"/>`,
+    mortar:`<path d="M18 8l6-6" stroke="#2b2118" stroke-width="3"/>`,
+    armor:`<rect x="12" y="11" width="16" height="6" rx="1" fill="#2b2118" opacity=".55"/>`,
+    scout:`<circle cx="22" cy="5" r="3" fill="none" stroke="#2b2118" stroke-width="1.6"/><path d="M22 8v2" stroke="#2b2118" stroke-width="1.6"/>`,
+    smoke:`<circle cx="3" cy="9" r="2.5" fill="#9a8a76"/><circle cx="7" cy="5" r="3" fill="#b3a490"/>`,
+  };
+  return `<svg viewBox="0 0 40 28" aria-hidden="true">${body}${marks[TYPES[t].g]}</svg>`;
+}
+
+let E, S = null, mode = 0, sel = null, handSel = null, targeting = null, busy = false, logs = [];
+const $ = id => document.getElementById(id);
+const who = p => mode === 1 ? (p === 0 ? "파랑 팀" : "빨강 팀") : (p === 0 ? "나" : "AI");
+
+function readState(){
+  const s = new Int32Array(E.memory.buffer, E.state(), 14 + 24*4);
+  const st = {len:s[0], cur:s[1], actions:s[2], winner:s[3], dn:s[4], turn:s[5], hn:[s[6],s[7]],
+    hand:[[s[8],s[9],s[10]].slice(0,s[6]), [s[11],s[12],s[13]].slice(0,s[7])], cars:[]};
+  for(let i=0;i<st.len;i++) st.cars.push({type:s[14+i*4], owner:s[15+i*4], armor:s[16+i*4], used:s[17+i*4]});
+  return st;
+}
+const human = () => mode === 1 || S.cur === 0;
+
+function log(msg){ logs.unshift(msg); logs = logs.slice(0,4); }
+
+function describe(st, k, a, b){
+  const p = who(st.cur);
+  if(k===A.DRAW) return `${p}: 카드 뽑기`;
+  if(k===A.PLAY) return `${p}: ${st.hand[st.cur][a] >= 0 ? TYPES[st.hand[st.cur][a]].n : "차량"} 선두 배치`;
+  if(k===A.MOVE) return `${p}: ${TYPES[st.cars[a].type].n} ${b===0?"앞으로":"뒤로"} 이동`;
+  if(k===A.ABIL){
+    const c = TYPES[st.cars[a].type].n;
+    const t = b>=0 && st.cars[b] ? ` → ${TYPES[st.cars[b].type].n}` : "";
+    return `${p}: ${c} 능력${t}`;
+  }
+  return `${p}: 턴 종료`;
+}
+
+function doAct(k,a=0,b=0){
+  const before = S;
+  if(!E.act(k,a,b)) return false;
+  if(k===A.END){
+    const after = readState();
+    const rear = before.cars[before.len-1];
+    let m = `🌪️ 폭풍이 ${before.len? (after.len===before.len ? `장갑차의 장갑을 벗겨냄` : `${who(rear.owner)}의 ${TYPES[rear.type].n}을(를) 삼킴`) : "지나감"}`;
+    log(m);
+  } else log(describe(before,k,a,b));
+  sel = null; handSel = null; targeting = null;
+  S = readState();
+  render(k===A.END ? -1 : (k===A.PLAY ? 0 : a));
+  if(k===A.END) $("road").querySelector(".storm").classList.add("hit");
+  if(S.winner >= 0) setTimeout(showEnd, 500);
+  return true;
+}
+
+function render(flashIdx=-1){
+  const me = mode===1 ? S.cur : 0;
+  const t = $("turn");
+  t.textContent = S.winner>=0 ? "게임 종료" : `${S.turn}턴 · ${who(S.cur)} 차례`;
+  t.className = "turn " + (S.cur===0 ? "me" : "ai");
+  $("pips").innerHTML = [0,1,2].map(i=>`<span class="pip ${i<S.actions?"on":""}"></span>`).join("");
+  const opp = mode===1 ? 1-S.cur : 1;
+  $("deck").textContent = `덱 ${S.dn}장 · ${who(opp)} 손패`;
+  $("aihand").innerHTML = "<i></i>".repeat(S.hn[opp]) || "<span>0</span>";
+
+  let h = `<div class="flag">▲ 선두</div>`;
+  S.cars.forEach((c,i)=>{
+    const ty = TYPES[c.type];
+    let cls = `car o${c.owner}`;
+    if(sel===i) cls += " sel";
+    if(targeting!==null && E.can(A.ABIL, targeting, i)) cls += " tgt";
+    if(c.used) cls += " used";
+    if(i===flashIdx) cls += " flash";
+    const badges = (c.type===6 && c.armor ? `<span class="tag">장갑</span>` : "") + (c.used ? `<span class="tag">사용함</span>` : "");
+    h += `<div class="${cls}" data-i="${i}">
+      <div class="pos">${i+1}</div>
+      <div class="ic">${glyph(c.type)}</div>
+      <div class="tx"><div class="nm">${ty.n}<span class="tag who${c.owner}">${who(c.owner)}</span>${badges}</div><div class="ds">${ty.d}</div></div>
+    </div>`;
+  });
+  h += `<div class="storm"><span>▼ 모래폭풍 ▼</span></div>`;
+  $("road").innerHTML = h;
+  $("road").querySelectorAll(".car").forEach(el=>el.onclick=()=>tapCar(+el.dataset.i));
+  $("log").innerHTML = logs.map(l=>`<div>${l}</div>`).join("") || "<div>게임 시작! 내 차량을 눌러 행동을 고르세요.</div>";
+
+  // Hand
+  const hand = S.hand[me];
+  const hb = $("hand");
+  hb.innerHTML = hand.length ? hand.map((t,i)=>`<div class="hc ${handSel===i?"sel":""}" data-h="${i}"><div class="nm">${glyph(t)}${TYPES[t].n}</div><div class="ds">${TYPES[t].d}</div></div>`).join("")
+    : `<div class="empty">손패가 비었어요 — 카드를 뽑아보세요</div>`;
+  hb.querySelectorAll(".hc").forEach(el=>el.onclick=()=>{ if(!human()||busy) return; handSel = handSel===+el.dataset.h?null:+el.dataset.h; sel=null; targeting=null; render(); });
+  hb.querySelectorAll(".hc svg").forEach(s=>s.style.color = me===0 ? "var(--me)" : "var(--ai)");
+
+  // Controls
+  const ctl = $("ctl"); let hint = "";
+  const can = human() && !busy && S.winner<0;
+  if(targeting!==null){
+    hint = `${TYPES[S.cars[targeting].type].n}: 대상을 고르세요 (빨간 테두리)`;
+    ctl.innerHTML = `<button class="btn" id="cancel">취소</button>`;
+    $("cancel").onclick=()=>{targeting=null;render();};
+  } else if(handSel!==null){
+    hint = `${TYPES[hand[handSel]].n}을(를) 행렬 선두에 배치할까요?`;
+    ctl.innerHTML = `<button class="btn" id="cancel">취소</button><button class="btn pri" id="play" ${E.can(A.PLAY,handSel,0)&&can?"":"disabled"}>선두에 배치</button>`;
+    $("cancel").onclick=()=>{handSel=null;render();};
+    $("play").onclick=()=>doAct(A.PLAY,handSel,0);
+  } else if(sel!==null){
+    const c = S.cars[sel], ty = TYPES[c.type];
+    const abil = ty.passive ? false : ty.tgt ? S.cars.some((_,j)=>E.can(A.ABIL,sel,j)) : E.can(A.ABIL,sel,-1);
+    hint = `${ty.n} 선택됨`;
+    ctl.innerHTML = `<button class="btn" id="up" ${E.can(A.MOVE,sel,0)&&can?"":"disabled"}>▲ 앞으로</button>
+      <button class="btn" id="dn" ${E.can(A.MOVE,sel,1)&&can?"":"disabled"}>▼ 뒤로</button>
+      <button class="btn pri" id="ab" ${abil&&can?"":"disabled"}>⚡ 능력</button>`;
+    $("up").onclick=()=>doAct(A.MOVE,sel,0);
+    $("dn").onclick=()=>doAct(A.MOVE,sel,1);
+    $("ab").onclick=()=>{ if(ty.tgt){ targeting=sel; sel=null; render(); } else doAct(A.ABIL,sel,-1); };
+  } else {
+    hint = !can ? (S.winner>=0 ? "" : `${who(S.cur)}이(가) 생각 중…`) :
+      S.actions>0 ? `행동 ${S.actions}번 남음 · 내 차량이나 손패를 누르세요` : "행동을 다 썼어요 — 턴을 끝내세요";
+    ctl.innerHTML = `<button class="btn" id="draw" ${E.can(A.DRAW,0,0)&&can?"":"disabled"}>🂠 카드 뽑기</button>
+      <button class="btn pri" id="end" ${can?"":"disabled"}>턴 종료 🌪️</button>`;
+    $("draw").onclick=()=>doAct(A.DRAW);
+    $("end").onclick=()=>endTurn();
+  }
+  $("hint").textContent = hint;
+}
+
+function tapCar(i){
+  if(!human()||busy||S.winner>=0) return;
+  if(targeting!==null){
+    if(E.can(A.ABIL,targeting,i)) doAct(A.ABIL,targeting,i);
+    return;
+  }
+  handSel = null;
+  sel = (S.cars[i].owner===S.cur && sel!==i) ? i : null;
+  render();
+}
+
+function endTurn(){
+  doAct(A.END);
+  if(S.winner<0 && mode===0 && S.cur===1) aiTurn();
+}
+
+async function aiTurn(){
+  busy = true; render();
+  await wait(700);
+  while(S.winner<0 && S.cur===1){
+    const o = new Int32Array(E.memory.buffer, E.ai_next(), 3);
+    const k=o[0], a=o[1], b=o[2];
+    if(k===A.ABIL){ targeting=null; sel=a; render(); await wait(350); }
+    doAct(k,a,b);
+    await wait(k===A.END ? 300 : 750);
+  }
+  busy = false; render();
+}
+const wait = ms => new Promise(r=>setTimeout(r,ms));
+
+function showEnd(){
+  const w = S.winner;
+  $("endTitle").textContent = mode===1 ? `${who(w)} 승리! 🏁` : (w===0 ? "승리! 🏁" : "패배… 🌪️");
+  $("endText").textContent = mode===1 ? `${S.turn-1}턴 만에 결판이 났어요.` : (w===0 ? `${S.turn-1}턴 만에 AI 팀을 폭풍 속으로 밀어 넣었어요.` : "AI 팀이 끝까지 살아남았어요. 다시 도전해 보세요!");
+  $("endM").classList.add("show");
+}
+function closeM(id){ $(id).classList.remove("show"); }
+function start(m){
+  mode = m; logs = []; sel = handSel = targeting = null; busy = false;
+  closeM("endM");
+  const first = Math.random()<0.5 ? 0 : 1;
+  E.new_game((Math.random()*0xffffffff)>>>0 || 1, first);
+  S = readState();
+  log(`${who(first)} 먼저 출발!`);
+  render();
+  if(mode===0 && S.cur===1) aiTurn();
+}
+
+$("rulesBtn").onclick=()=>$("rules").classList.add("show");
+$("typesList").innerHTML = TYPES.map((t,i)=>`<div>${glyph(i)}<span><b>${t.n}</b> — ${t.d}</span></div>`).join("");
+$("rules").onclick = e => { if(e.target.id==="rules") closeM("rules"); };
+
+const bytes = Uint8Array.from(atob(WASM_B64), c=>c.charCodeAt(0));
+WebAssembly.instantiate(bytes).then(({instance})=>{ E = instance.exports; start(0); });
+</script>
+</body>
+</html>
