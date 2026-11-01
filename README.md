@@ -24,6 +24,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Four Deep | `/four-deep/` | private repo `alxpark/four-deep` (`./build.sh` → `index.html`) |
 | 젬 바자르 | `/gem-bazaar/` | repo `alxpark/gem-bazaar` (`./build.sh` → `dist/index.html`) |
 | 샌드스톰 랠리 | `/sandstorm-rally/` | private repo `alxpark/sandstorm-rally` (`./build.sh` → `index.html`) |
+| Brass: Birmingham (비공식) | `/brass-birmingham/` | private repo `alxpark/brass-birmingham` (`./build.sh` → `dist/index.html`) |
 
 ## Adding an app
 
