@@ -14,7 +14,28 @@ header .st{font-size:13px;opacity:.9}
 #wrap{display:flex;flex-direction:column;gap:10px;padding:10px;max-width:1400px;margin:0 auto}
 @media(min-width:1000px){#wrap{flex-direction:row;align-items:flex-start}#mapbox{flex:1.35;position:sticky;top:10px}#side{flex:1;max-width:520px}}
 #mapbox{position:relative;background:#e9dfc8;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-#mapscroll{overflow:auto;max-height:85vh}#mapscroll.z canvas{width:220%}
+#mapwrap{position:relative;width:100%;aspect-ratio:1000/1130;max-height:88vh;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+#mapwrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#mapctl{position:absolute;right:6px;bottom:6px;display:flex;flex-direction:column;gap:5px;z-index:3;opacity:.88}
+#mapctl button{width:34px;height:34px;border-radius:9px;border:1px solid #7d6a48;background:rgba(255,250,240,.93);color:#3a2f22;font-size:16px;line-height:1;padding:0;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#zlv{position:absolute;right:46px;bottom:10px;z-index:3;font-size:11.5px;background:rgba(255,250,240,.85);border-radius:6px;padding:2px 6px;color:#5b4a33;pointer-events:none}
+#sheet{position:absolute;left:8px;right:48px;bottom:8px;max-height:52%;overflow:auto;background:rgba(255,250,240,.97);border:1px solid #c9b48a;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.25);padding:10px 12px;z-index:4;display:none;font-size:13.5px;line-height:1.5}
+#sheet.on{display:block;animation:fadeIn .25s ease-out}
+#sheet .sh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+#sheet .sh b{font-size:15px}
+#sheet .x{border:none;background:#e9dfc8;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer}
+#sheet .opt{display:block;width:100%;text-align:left;margin-top:6px;padding:10px 11px;border-radius:9px;border:1px solid #d8cbb0;background:#fff;font-size:14px;color:var(--ink);cursor:pointer}
+#sheet .opt.go{background:#5b4a33;color:#fff;border:none}
+#sheet .sl{padding:5px 0;border-bottom:1px dashed #e4d7bc}
+#sheet .sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.25)}
+#maphint{display:none;position:absolute;left:8px;top:8px;right:8px;z-index:3;background:rgba(58,47,34,.9);color:#f4e6c8;border-radius:10px;padding:7px 10px;font-size:12.5px;line-height:1.45}
+#mapbox.fs{position:fixed;inset:0;z-index:30;border-radius:0;border:none;max-width:none}
+#mapbox.fs #mapwrap{aspect-ratio:auto;height:100vh;height:100dvh;max-height:none}
+#mapbox.fs #maphint{display:block;padding-right:52px}
+#mapbox.fs #mapctl{z-index:6;opacity:1}
+#mapbox.fs #zfs{position:fixed;box-shadow:0 2px 8px rgba(0,0,0,.35);right:14px;top:14px;width:38px;height:38px;background:#fff8e8}
+body.fsopen{overflow:hidden}
+@media(max-width:700px){#wrap{padding:6px}#mapbox{margin:0 -2px}}
 canvas{display:block;width:100%;height:auto;touch-action:manipulation}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .card h3{margin:0 0 8px;font-size:13px;color:var(--mute);font-weight:600}
@@ -76,7 +97,9 @@ details summary{cursor:pointer;color:var(--mute);font-size:13px}
 <body>
 <header><h1>Brass: Birmingham 웹 버전 <span style="font-weight:400;font-size:12px;opacity:.7">(비공식 · WebAssembly)</span></h1><div class="st" id="status"></div></header>
 <div id="wrap">
-  <div id="mapbox"><button id="zoom" class="big" style="position:absolute;right:8px;bottom:8px;z-index:2;opacity:.9;padding:6px 9px;font-size:12px">🔍 확대</button><div id="mapscroll"><canvas id="cv" width="1000" height="1130"></canvas></div></div>
+  <div id="mapbox"><div id="mapwrap"><canvas id="cv"></canvas>
+    <div id="mapctl"><button id="zin" aria-label="확대">＋</button><button id="zout" aria-label="축소">－</button><button id="zfit" aria-label="전체 지도">⤢</button><button id="zfs" aria-label="전체화면">⛶</button></div>
+    <div id="zlv"></div><div id="maphint"></div><div id="sheet"></div></div></div>
   <div id="side">
     <div class="card">
       <div class="me" id="me"></div>
@@ -142,7 +165,7 @@ async function boot(){
 }
 function start(n){
   document.getElementById('setup').style.display='none';
-  X.init(n,(Math.random()*1e9)|0);sel=0;mode=null;refresh();
+  X.init(n,(Math.random()*1e9)|0);sel=0;mode=null;resizeMap(true);refresh();
 }
 let PREV=null,FXL=[];
 function diffFx(prev,cur){
@@ -217,7 +240,9 @@ requestAnimationFrame(loop);
 function draw(){
   NOW=NOW||performance.now();const pu=PULSE();
   const T=hlTargets();HIT=[];
-  g.clearRect(0,0,1000,1130);
+  if(!cssW)resizeMap(true);
+  g.setTransform(1,0,0,1,0,0);g.fillStyle="#ddd1b6";g.fillRect(0,0,cv.width,cv.height);
+  const k0=DPR*VW.s;g.setTransform(k0,0,0,k0,-VW.ox*k0,-VW.oy*k0);
   g.fillStyle="#e9dfc8";g.fillRect(0,0,1000,1130);
   // links
   MAP.links.forEach((l,i)=>{
@@ -232,7 +257,7 @@ function draw(){
     g.restore();
     const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
     if(T.lk.has(i)){glowCircle(mx,my,11+4*pu,"#ffc400",0.55+0.45*pu,8+22*pu,"rgba(255,214,60,.85)");
-      HIT.push({kind:'link',i,x:mx,y:my,r:22,acts:T.lk.get(i)})}
+      HIT.push({kind:'link',i,x:mx,y:my,r:Math.max(22,20/VW.s),acts:T.lk.get(i)})}
   });
   // locations
   MAP.locs.forEach((L,i)=>{
@@ -270,7 +295,7 @@ function draw(){
         for(let c=0;c<s[4];c++){g.beginPath();g.arc(sx+4+c*4.5,sy-3,3,0,7);g.fillStyle=s[1]===3?"#222":s[1]===4?"#d27a2c":"#e2b33a";g.fill();g.strokeStyle="#000";g.lineWidth=.6;g.stroke()}
       }
       if(T.sl.has(k)){glowRect(sx-3,sy-3,36,36,"#ffc400",0.55+0.45*pu,8+22*pu);
-        HIT.push({kind:'slot',i:k,x:sx+15,y:sy+15,r:22,acts:T.sl.get(k)})}
+        HIT.push({kind:'slot',i:k,x:sx+15,y:sy+15,r:Math.max(22,20/VW.s),acts:T.sl.get(k)})}
     });
   });
   if(coachOn()&&COACH&&COACH[0]&&S.cur===0){const d=D(COACH[0].a);let px=null,py=null;
@@ -292,20 +317,140 @@ function draw(){
   });
   MAP.locs.forEach((L,i)=>{const B=boxOf(i);let nm=L.n;
     if(i>=22&&!S.merch.some((m,k)=>MAP.mloc[k]===i&&m[0]))nm+=" (비활성)";
-    g.save();g.font="bold 14px sans-serif";g.textAlign="center";g.textBaseline="bottom";g.lineJoin="round";
-    g.lineWidth=4;g.strokeStyle="rgba(233,223,200,.95)";g.strokeText(nm,L.x,B.y-3);g.fillStyle="#2b2418";g.fillText(nm,L.x,B.y-3);g.restore()});
+    const fz=Math.round(Math.max(14,Math.min(23,10.5/VW.s)));
+    g.save();g.font="bold "+fz+"px sans-serif";g.textAlign="center";g.textBaseline="bottom";g.lineJoin="round";
+    g.lineWidth=Math.max(4,fz*.32);g.strokeStyle="rgba(233,223,200,.95)";g.strokeText(nm,L.x,B.y-3);g.fillStyle="#2b2418";g.fillText(nm,L.x,B.y-3);g.restore()});
+  if(INFO_LOC!=null){const B=boxOf(INFO_LOC);g.save();g.setLineDash([6,4]);g.lineWidth=3;g.strokeStyle="#3a2f22";rr(B.x-6,B.y-6,B.w+12,B.h+12,10);g.stroke();g.restore()}
   g.textAlign="left";g.textBaseline="alphabetic";g.font="12px sans-serif";g.fillStyle="#5b4a33";
   g.fillText(S.era===0?"점선(파랑) = 운하 가능 구간":"점선(회색) = 철도 가능 구간",14,1118);
 }
 function line(a,b){g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke()}
-cv.addEventListener('click',e=>{
-  const r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*1000/r.width,y=(e.clientY-r.top)*1130/r.height;
-  let best=null,bd=1e9;
-  for(const h of HIT){const d=Math.hypot(h.x-x,h.y-y);if(d<h.r&&d<bd){bd=d;best=h}}
-  if(!best)return;
-  if(best.acts.length===1)doAct(best.acts[0]);else{showOpts(best.acts);document.getElementById('opts').scrollIntoView({block:'nearest'})}
+/* ---------- viewport: pinch / pan / double-tap / wheel ---------- */
+const wrap=document.getElementById('mapwrap'),mapbox=document.getElementById('mapbox'),sheet=document.getElementById('sheet');
+let VW={s:1,ox:0,oy:0},cssW=0,cssH=0,DPR=1,FIT=1,INFO_LOC=null,SHEET_ACTS=null;
+const MOBILE=()=>cssW<700;
+function fitView(){VW.s=FIT;VW.ox=-(cssW/FIT-1000)/2;VW.oy=-(cssH/FIT-1130)/2}
+function clampView(){
+  VW.s=Math.max(FIT,Math.min(FIT*5,VW.s));
+  const vw=cssW/VW.s,vh=cssH/VW.s;
+  VW.ox=vw>=1000?-(vw-1000)/2:Math.max(-20,Math.min(1020-vw,VW.ox));
+  VW.oy=vh>=1130?-(vh-1130)/2:Math.max(-20,Math.min(1150-vh,VW.oy));
+  const zoomed=VW.s>FIT*1.02||mapbox.classList.contains('fs');
+  wrap.style.touchAction=zoomed?'none':'pan-y';
+  document.getElementById('zlv').textContent=VW.s>FIT*1.02?`${(VW.s/FIT).toFixed(1)}×`:'';
+}
+function resizeMap(first){
+  const r=wrap.getBoundingClientRect();if(!r.width)return;
+  const was=cssW?VW.s/FIT:1;
+  cssW=r.width;cssH=r.height;DPR=Math.min(3,window.devicePixelRatio||1);
+  cv.width=Math.round(cssW*DPR);cv.height=Math.round(cssH*DPR);
+  FIT=Math.min(cssW/1000,cssH/1130);
+  if(first||was<=1.02)fitView();else VW.s=FIT*was;
+  clampView();
+}
+window.addEventListener('resize',()=>{resizeMap();if(S)draw()});
+function toL(cx,cy){return{x:cx/VW.s+VW.ox,y:cy/VW.s+VW.oy}}
+function zoomAt(cx,cy,ns){const L=toL(cx,cy);VW.s=ns;VW.ox=L.x-cx/VW.s;VW.oy=L.y-cy/VW.s;clampView();draw()}
+let anim=null;
+function animateTo(t){const f={...VW},t0=performance.now();cancelAnimationFrame(anim);
+  const step=now=>{const k=Math.min(1,(now-t0)/320),e=1-Math.pow(1-k,3);
+    VW.s=f.s+(t.s-f.s)*e;VW.ox=f.ox+(t.ox-f.ox)*e;VW.oy=f.oy+(t.oy-f.oy)*e;clampView();draw();if(k<1)anim=requestAnimationFrame(step)};
+  anim=requestAnimationFrame(step)}
+function viewFor(x0,y0,x1,y1,maxZ){const pad=50,w=x1-x0+pad*2,h=y1-y0+pad*2;
+  const s=Math.max(FIT,Math.min(cssW/w,cssH/h,FIT*maxZ));
+  return{s,ox:(x0+x1)/2-cssW/s/2,oy:(y0+y1)/2-cssH/s/2}}
+function focusTargets(){
+  if(!MOBILE()&&!mapbox.classList.contains('fs'))return;
+  draw();if(!HIT.length)return;
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;HIT.forEach(h=>{x0=Math.min(x0,h.x);y0=Math.min(y0,h.y);x1=Math.max(x1,h.x);y1=Math.max(y1,h.y)});
+  const t=viewFor(x0,y0-30,x1,y1+20,3.2);if(t.s>FIT*1.15)animateTo(t);
+}
+document.getElementById('zin').onclick=()=>zoomAt(cssW/2,cssH/2,VW.s*1.5);
+document.getElementById('zout').onclick=()=>zoomAt(cssW/2,cssH/2,VW.s/1.5);
+document.getElementById('zfit').onclick=()=>{const f={...VW};fitView();const t={...VW};VW=f;animateTo(t)};
+document.getElementById('zfs').onclick=()=>{
+  const on=!mapbox.classList.contains('fs');mapbox.classList.toggle('fs',on);document.body.classList.toggle('fsopen',on);
+  document.getElementById('zfs').textContent=on?'✕':'⛶';document.getElementById('zfs').setAttribute('aria-label',on?'전체화면 닫기':'전체화면');
+  resizeMap(true);renderMapHint();draw();
+};
+wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,VW.s*Math.exp(-e.deltaY*0.0015))},{passive:false});
+const PT=new Map();let G=null,lastTap=null,tapTimer=null;
+const rel=e=>{const r=wrap.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
+cv.addEventListener('pointerdown',e=>{
+  const p=rel(e);PT.set(e.pointerId,p);
+  if(PT.size===1)G={type:'tap',sx:p.x,sy:p.y,ox:VW.ox,oy:VW.oy,t:performance.now(),touch:e.pointerType!=='mouse'};
+  else if(PT.size===2){const [a,b]=[...PT.values()];G={type:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:VW.s,L:toL((a.x+b.x)/2,(a.y+b.y)/2)}}
 });
-
+cv.addEventListener('pointermove',e=>{
+  if(!PT.has(e.pointerId)||!G)return;const p=rel(e);PT.set(e.pointerId,p);
+  if(G.type==='tap'&&Math.hypot(p.x-G.sx,p.y-G.sy)>8){
+    if(VW.s>FIT*1.02||mapbox.classList.contains('fs')){G.type='pan';try{cv.setPointerCapture(e.pointerId)}catch(_){}}else{G=null;return}}
+  if(G.type==='pan'){VW.ox=G.ox-(p.x-G.sx)/VW.s;VW.oy=G.oy-(p.y-G.sy)/VW.s;clampView();draw()}
+  else if(G.type==='pinch'&&PT.size===2){const [a,b]=[...PT.values()],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    VW.s=G.s0*Math.hypot(a.x-b.x,a.y-b.y)/G.d0;clampView();VW.ox=G.L.x-m.x/VW.s;VW.oy=G.L.y-m.y/VW.s;clampView();draw()}
+});
+const endPt=e=>{
+  const had=PT.has(e.pointerId);PT.delete(e.pointerId);
+  if(!had||!G)return;
+  if(G.type==='pinch'){if(PT.size===0)G=null;return}
+  if(G.type==='tap'&&e.type==='pointerup'&&performance.now()-G.t<600){
+    const p={x:G.sx,y:G.sy},touch=G.touch,now=performance.now();
+    if(lastTap&&now-lastTap.t<320&&Math.hypot(p.x-lastTap.x,p.y-lastTap.y)<30){ // double tap: zoom in / reset
+      clearTimeout(tapTimer);lastTap=null;
+      if(VW.s>FIT*2.4)document.getElementById('zfit').onclick();else{const L=toL(p.x,p.y),ns=VW.s*2;animateTo({s:ns,ox:L.x-p.x/ns,oy:L.y-p.y/ns})}
+    }else{lastTap={...p,t:now};clearTimeout(tapTimer);
+      if(touch)tapTimer=setTimeout(()=>onTap(p,true),260);else onTap(p,false)}
+  }
+  G=null;
+};
+cv.addEventListener('pointerup',endPt);cv.addEventListener('pointercancel',endPt);
+function onTap(p,touch){
+  const L=toL(p.x,p.y);let best=null,bd=1e9;
+  for(const h of HIT){const d=Math.hypot(h.x-L.x,h.y-L.y);if(d<h.r&&d<bd){bd=d;best=h}}
+  if(best){
+    if(best.acts.length===1&&!touch){doAct(best.acts[0]);return}
+    showChoices(best);return}
+  for(let i=0;i<MAP.locs.length;i++){const B=boxOf(i),m=Math.max(6,10/VW.s);
+    if(L.x>B.x-m&&L.x<B.x+B.w+m&&L.y>B.y-m-16&&L.y<B.y+B.h+m){showLocInfo(i);return}}
+  closeSheet();
+}
+function closeSheet(){sheet.classList.remove('on');sheet.innerHTML="";INFO_LOC=null;SHEET_ACTS=null;draw()}
+function showChoices(hit){
+  INFO_LOC=null;SHEET_ACTS=hit.acts;
+  const where=hit.kind==='link'?(()=>{const l=MAP.links[hit.i];return `${MAP.locs[l[0]].n} ↔ ${MAP.locs[l[1]].n}`})():MAP.locs[MAP.slots[hit.i][0]].n;
+  sheet.innerHTML=`<div class="sh"><b>${where}</b><button class="x" aria-label="닫기">✕</button></div>`+
+    hit.acts.map(a=>`<button class="opt go" data-a="${a}">${label(a)}</button>`).join("")+
+    `<div class="hint">버튼을 누르면 실행돼요.</div>`;
+  sheet.querySelector('.x').onclick=closeSheet;
+  sheet.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{closeSheet();doAct(+b.dataset.a)});
+  sheet.classList.add('on');
+}
+function showLocInfo(i){
+  INFO_LOC=i;SHEET_ACTS=null;const L=MAP.locs[i];let body="";
+  if(i>=22){
+    const ms=MAP.mloc.map((m,k)=>m===i?k:-1).filter(k=>k>=0);
+    body=ms.map(k=>{const m=S.merch[k];return `<div class="sl">${m[0]?`구매: <b>${MTN[m[0]]==="모두"?"면직물·제조업·도자기 모두":MTN[m[0]]}</b>`:"비활성"}${m[0]>=2?(m[1]?" · 🍺 상인 맥주 있음":" · 맥주 사용됨"):""}</div>`}).join("")+
+      (BONUS[i]?`<div class="hint">상인 맥주로 팔면 보너스: ${BONUS[i]}</div>`:"");
+  }else{
+    body=locSlots(i).map((k,j)=>{const s=S.slots[k],m=MAP.slots[k][1];
+      if(s[0]<0)return `<div class="sl">${j+1}번 칸 · 빈칸 — ${[0,1,2,3,4,5].filter(t=>m&(1<<t)).map(t=>`<span class="sw" style="background:${TCOL[t]}"></span>${TN[t]}`).join(" / ")}</div>`;
+      const T=MAP.tiles[s[1]][s[2]-1],res=s[1]===3?"석탄":s[1]===4?"철":s[1]===5?"맥주":"";
+      return `<div class="sl">${j+1}번 칸 · ${pn(s[0])} <span class="sw" style="background:${TCOL[s[1]]}"></span><b>${TN[s[1]]} Lv${s[2]}</b> ${s[3]?"✓ 뒤집힘":"(아직 안 뒤집힘)"}${res?` · ${res} ${s[4]}개`:""}<br><span style="color:#7a6c55;font-size:12.5px">${T[4]}점 · 수입+${T[5]} · 연결 아이콘 ${T[6]}${s[1]<=2?` · 판매에 맥주 ${T[7]}`:""}</span></div>`}).join("");
+  }
+  const lk=MAP.links.map((l,k)=>(l[0]===i||l[1]===i)?k:-1).filter(k=>k>=0);
+  const built=lk.filter(k=>S.links[k]>=0).map(k=>{const l=MAP.links[k],o=l[0]===i?l[1]:l[0];return `${pn(S.links[k])}→${MAP.locs[o].n}`});
+  body+=`<div class="hint">연결로: ${built.length?built.join(", "):"아직 없음"} (가능한 구간 ${lk.length}개)</div>`;
+  sheet.innerHTML=`<div class="sh"><b>${L.n}</b><button class="x" aria-label="닫기">✕</button></div>${body}`;
+  sheet.querySelector('.x').onclick=closeSheet;sheet.classList.add('on');draw();
+}
+function renderMapHint(){
+  const el=document.getElementById('maphint');if(!mapbox.classList.contains('fs')||!S){return}
+  const me=S.players[0];let t=`${S.era===0?"운하":"철도"} 시대 ${S.round}/${S.rounds} · £${me.money} · 수입 ${me.lvl} · ${me.vp}점<br>`;
+  if(S.over)t+="게임 종료";else if(S.cur!==0)t+=`${PNAME[S.cur]} 차례…`;
+  else if(S.phase!==0)t+="지도에서 빛나는 곳을 누르거나, 닫고 패널에서 끝내기를 고르세요.";
+  else{const c=me.hand[sel];t+=`카드 <b>${cardName(c)}</b>${mode?` · <b>${({build:"건설",net:S.era?"철도":"운하",dev:"개발",sell:"판매"})[mode]||""}</b>: 빛나는 곳을 누르세요`:" · 빛나는 칸 = 이 카드로 지을 수 있는 곳"}`}
+  el.innerHTML=t;
+}
 /* ---------- coach ---------- */
 let COACH=null;
 const coachOn=()=>document.getElementById('coachon').checked;
@@ -375,7 +520,7 @@ function renderCoach(){
   });
   el.innerHTML=html;
   el.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>doAct(+b.dataset.run));
-  el.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{const d=D(+b.dataset.show);sel=d.c;mode={1:'build',2:'net',3:'dev',4:'sell'}[d.t];render();document.getElementById('cv').scrollIntoView({behavior:'smooth',block:'start'})});
+  el.querySelectorAll('[data-show]').forEach(b=>b.onclick=()=>{const d=D(+b.dataset.show);sel=d.c;mode={1:'build',2:'net',3:'dev',4:'sell'}[d.t];render();document.getElementById('mapbox').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(focusTargets,350)});
 }
 function renderCardInfo(){
   const el=document.getElementById('cardinfo'),me=S.players[0];
@@ -440,7 +585,7 @@ function render(){
       const has=t=>mine.filter(a=>D(a).t===t);
       const defs=[["build","건설",1],["net",S.era?"철도":"운하",2],["dev","개발",3],["sell","판매",4],["loan","대출",5],["scout","정찰",6],["pass","패스",0]];
       defs.forEach(([k,n,t])=>{const b=document.createElement('button');b.textContent=n;const L=has(t);b.disabled=!L.length;if(mode===k)b.className='on';
-        b.onclick=()=>{if(t===5||t===6||t===0){if(mode===k){doAct(L[0]);return}mode=k;render();return}mode=k;render()};A.appendChild(b)});
+        b.onclick=()=>{if(t===5||t===6||t===0){if(mode===k){doAct(L[0]);return}mode=k;render();return}mode=k;render();focusTargets()};A.appendChild(b)});
       if(mode){const t=defs.find(d=>d[0]===mode)[2],L=has(t);
         if(t===5||t===6||t===0){AH.textContent=({5:"£30을 받고 수입 레벨 -3. ",6:"이 카드 + 2장을 버리고 와일드 장소·와일드 산업 카드를 받습니다. ",0:"이 카드를 버리고 아무것도 하지 않습니다. "})[t]+"한 번 더 누르면 실행합니다.";}
         else{showOpts(L);AH.textContent=({build:"지도에서 노란 테두리 칸을 누르거나 목록에서 고르세요.",net:"지도에서 노란 점을 누르거나 목록에서 고르세요.",dev:"철 1개로 해당 산업의 가장 낮은 타일을 제거합니다(다음에 1개 더 가능).",sell:"상인과 연결된 내 면직물·제조업·도자기를 팝니다."})[mode]}
@@ -464,9 +609,10 @@ function render(){
     return `<div><span class="tag" style="background:${TCOL[t]}">${n}</span>Lv${lv} £${T[1]}${res} → ${T[4]}점, 수입+${T[5]}, 연결 ${T[6]}${extra}${T[8]?" · 운하 전용":""}${T[9]?" · 개발 불가":""} <span style="color:#998">(전체 ${left}개 남음)</span></div>`}).join("");
   document.getElementById('log').innerHTML=S.log.slice().reverse().map(l=>`<div>${fmtLog(l)}</div>`).join("");
   renderCoach();
+  renderMapHint();
+  if(SHEET_ACTS)closeSheet();else if(INFO_LOC!=null)showLocInfo(INFO_LOC);
   draw();
 }
-document.getElementById('zoom').onclick=()=>{const m=document.getElementById('mapscroll');m.classList.toggle('z');document.getElementById('zoom').textContent=m.classList.contains('z')?'🔍 축소':'🔍 확대'};
 boot().catch(e=>{document.querySelector('#setup .box').innerHTML='<h2>로드 실패</h2><p>이 환경에서 WebAssembly를 실행할 수 없습니다: '+e.message+'</p>'});
 </script>
 </body>
