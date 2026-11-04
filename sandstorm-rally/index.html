@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>샌드스톰 랠리 — WASM 카드 게임</title>
+<title>Sandstorm Rally — WASM card game</title>
 <style>
 :root{
   --sand:#f3e6cf; --sand2:#e8d4b0; --ink:#2b2118; --muted:#7a6650;
@@ -85,7 +85,9 @@ h1 small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-
 .coach .go{margin-top:7px;width:100%;background:var(--gold);color:var(--ink)}
 .car.coachhint,.hc.coachhint,.btn.coachhint{outline:2.5px dashed var(--gold);outline-offset:2px}
 .btn.ghost.on{background:var(--gold);border-color:var(--gold)}
-.hdr-btns{display:flex;gap:6px}
+.hdr-btns{display:flex;gap:6px;flex:none}
+.btn.sm{padding:9px 9px;font-size:13px}
+@media (max-width:360px){header{flex-wrap:wrap}.hdr-btns{width:100%}.hdr-btns .btn{flex:1}}
 .modal{position:fixed;inset:0;background:rgba(43,33,24,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
 .modal.show{display:flex}
 .sheet{background:var(--card);border-radius:16px;max-width:440px;width:100%;max-height:86vh;overflow:auto;padding:16px 16px 14px}
@@ -104,8 +106,12 @@ h1 small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-
 <body>
 <div id="app">
   <header>
-    <h1>샌드스톰 랠리<small>WebAssembly 카드 레이스 · 모래폭풍에서 살아남기</small></h1>
-    <div class="hdr-btns"><button class="btn ghost on" id="coachBtn">🧭 코치</button><button class="btn ghost" id="rulesBtn">규칙</button></div>
+    <h1><span id="tTitle"></span><small id="tSub"></small></h1>
+    <div class="hdr-btns">
+      <button class="btn ghost sm" id="langBtn" aria-label="Language"></button>
+      <button class="btn ghost on sm" id="coachBtn"></button>
+      <button class="btn ghost sm" id="rulesBtn"></button>
+    </div>
   </header>
   <div class="status">
     <div><div class="turn" id="turn"></div><div class="pips" id="pips"></div></div>
@@ -123,38 +129,214 @@ h1 small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-
 </div></div>
 
 <div class="modal" id="rules"><div class="sheet">
-  <h2>규칙</h2>
+  <div id="rulesBody"></div>
+  <div class="types" id="typesList"></div>
+  <p style="color:var(--muted);font-size:12px" id="rulesNote"></p>
+  <button class="btn" style="width:100%" onclick="closeM('rules')" id="rulesClose"></button>
+</div></div>
+
+<div class="modal" id="endM"><div class="sheet end">
+  <h2 id="endTitle"></h2><p id="endText"></p>
+  <div class="mode"><button class="btn" onclick="start(0)" id="againAI"></button><button class="btn ghost" onclick="start(1)" id="againHot"></button></div>
+</div></div>
+
+<script>
+const WASM_B64 = "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AkAgACgCeCIJQQFIDQAgCUEDcSEDAkACQCAJQQRPDQBBACEEQQAhAQwBCyAAQRBqIQIgCUH8////B3EhCEEAIQRBACEBA0AgASACQXFqLQAARWogAkF2ai0AAEVqIAJBe2otAABFaiACLQAARWohASACQRRqIQIgCCAEQQRqIgRHDQALCwJAIANFDQAgBEEFbCAAakEBaiECA0AgASACLQAARWohASACQQVqIQIgA0F/aiIDDQALCyABDQELIAAoAoQBDQAgACgCrAFBf0oNACAAQQE2AqwBCwJAIAlBAUgNACAJQQNxIQMCQAJAIAlBBE8NAEEAIQRBACEBDAELIABBEGohAiAJQfz///8HcSEIQQAhBEEAIQEDQCABIAJBcWotAABBAUZqIAJBdmotAABBAUZqIAJBe2otAABBAUZqIAItAABBAUZqIQEgAkEUaiECIAggBEEEaiIERw0ACwsCQCADRQ0AIARBBWwgAGpBAWohAgNAIAEgAi0AAEEBRmohASACQQVqIQIgA0F/aiIDDQALCyABDQMLIABBiAFqKAIADQIgACgCrAFBf0oNAiAAQQA2AqwBDAILIAdBA3EhAwJAAkAgB0EETw0AQQAhBEEAIQEMAQsgAEEQaiECIAdBfHEhCEEAIQRBACEBA0AgASACQXFqLQAARWogAkF2ai0AAEVqIAJBe2otAABFaiACLQAARWohASACQRRqIQIgCCAEQQRqIgRHDQALCwJAIANFDQAgBEEFbCAAakEBaiECA0AgASACLQAARWohASACQQVqIQIgA0F/aiIDDQALCyAHQQNxIQQCQAJAIAdBBE8NAEEAIQhBACEDDAELIABBEGohAiAHQXxxIQlBACEIQQAhAwNAIAMgAkFxai0AAEEBRmogAkF2ai0AAEEBRmogAkF7ai0AAEEBRmogAi0AAEEBRmohAyACQRRqIQIgCSAIQQRqIghHDQALCwJAIARFDQAgCEEFbCAAakEBaiECA0AgAyACLQAAQQFGaiEDIAJBBWohAiAEQX9qIgQNAAsLIANFIQMgAUUhAgsCQCAAKAKsAUF/Sg0AAkACQCACIANxQQFHDQBBASAGayECDAELIAIgA3JBAUcNAQsgACACNgKsAQsgAEEDNgKoASAAQQEgBms2AqQBIAAgACgCsAFBAWo2ArABIAdBAUgNACAHQQdx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";
+const A = {DRAW:0, PLAY:1, MOVE:2, ABIL:3, END:4};
+const GLYPHS = ["ram","hook","nitro","oil","tow","mortar","armor","scout","smoke"];
+const TFLAGS = [{}, {tgt:1}, {}, {}, {tgt:1}, {tgt:1}, {passive:1}, {}, {}];
+
+// ---------------- i18n ----------------
+// Korean particles depend on whether the last syllable has a final consonant.
+const josa = (w, a, b) => { const ch = w.charCodeAt(w.length-1); return (ch>=0xac00 && ch<=0xd7a3 && (ch-0xac00)%28) ? a : b; };
+const eul = w => w + josa(w,"을","를"), iga = w => w + josa(w,"이","가"), eun = w => w + josa(w,"은","는");
+
+const I18N = {
+en: {
+  title:"Sandstorm Rally", sub:"A WebAssembly card race · outrun the storm", pageTitle:"Sandstorm Rally — WASM card game",
+  langBtn:"🌐 한국어", coach:"🧭 Coach", rules:"Rules", close:"Close",
+  types:[
+    ["Rammer","Smash the enemy car directly ahead"],
+    ["Harpoon","Pull an enemy car up to 3 ahead to right behind you"],
+    ["Nitro","Jump straight to the front"],
+    ["Oil Slick","Slide the car directly behind you back 2 spaces"],
+    ["Tow Truck","Bring one of your cars to right behind you"],
+    ["Mortar","From the front 2 spots: destroy an enemy in the rear half (this car is used up)"],
+    ["Armored","Passive: survives the storm once"],
+    ["Scout","Draw 2 cards"],
+    ["Smoke","Swap the cars directly ahead of and behind you"],
+  ],
+  rulesHtml:`<h2>Rules</h2>
+  <p>Two racing teams drive in a single line, fleeing the sandstorm behind them. <b>Leave the other team with no cars to win!</b></p>
+  <ul>
+    <li>The caravan's <b>front</b> is at the top and its <b>rear</b> at the bottom.</li>
+    <li>On your turn you get <b>3 actions</b>, in any mix:<br>· Draw a card (hand limit 3)<br>· Put a car from your hand at the <b>front</b><br>· Move one of your cars one space forward/back (swap places)<br>· Use a car's ability (once per car per turn)</li>
+    <li>When a turn ends, the storm swallows <b>the rearmost car</b>.</li>
+    <li>After the storm, a team with no cars in the caravan loses.</li>
+  </ul>`,
+  rulesNote:"An original implementation inspired by card-racing board game mechanics. Game logic and AI are written in C and compiled to WebAssembly.",
+  who:(p,hot)=> hot ? (p===0?"Blue":"Red") : (p===0?"You":"AI"),
+  whoTag:(p,hot)=> hot ? (p===0?"Blue":"Red") : (p===0?"You":"AI"),
+  turnLine:(t,w)=>`Turn ${t} · ${w==="You"?"your":w+"'s"} move`,
+  gameOver:"Game over",
+  deckLine:(n,w)=>`Deck ${n} · ${w==="AI"?"AI":w} hand`,
+  front:"▲ FRONT", storm:"▼ SANDSTORM ▼",
+  tagArmor:"Armor", tagUsed:"Used",
+  logStart:"Game on! Tap one of your cars to choose an action.",
+  emptyHand:"Your hand is empty — try drawing a card",
+  pickTarget:n=>`${n}: pick a target (red outline)`,
+  cancel:"Cancel", playQ:n=>`Put ${n} at the front of the caravan?`, playBtn:"Place at front",
+  selected:n=>`${n} selected`, up:"▲ Forward", down:"▼ Back", ability:"⚡ Ability",
+  thinking:w=>`${w} is thinking…`,
+  actsLeft:n=>`${n} action${n>1?"s":""} left · tap one of your cars or a hand card`,
+  noActs:"No actions left — end your turn",
+  drawBtn:"🂠 Draw", endBtn:"End turn 🌪️",
+  lDraw:p=>`${p}: drew a card`, lPlay:(p,n)=>`${p}: put ${n} at the front`,
+  lMove:(p,n,f)=>`${p}: moved ${n} ${f?"forward":"back"}`, lAbil:(p,n,t)=>`${p}: ${n} ability${t?" → "+t:""}`, lEnd:p=>`${p}: ended turn`,
+  stormArmor:"🌪️ The storm stripped an Armored car's plating",
+  stormEat:(w,n)=>`🌪️ The storm swallowed ${w==="You"?"your":w+"'s"} ${n}`,
+  stormNone:"🌪️ The storm passed",
+  firstGo:w=>w==="You"?"You go first!":`${w} goes first!`,
+  winHot:w=>`${w} wins! 🏁`, win:"Victory! 🏁", lose:"Defeat… 🌪️",
+  endHot:t=>`Decided in ${t} turns.`, endWin:t=>`You pushed the AI team into the storm in ${t} turns.`,
+  endLose:"The AI team outlasted you. Give it another go!",
+  againAI:"Play again (vs AI)", againHot:"2-player hotseat",
+  // coach
+  owned:(n,mine)=> (mine?"your ":"enemy ")+n,
+  sDraw:"Draw a card", sPlay:n=>`Put ${n} from your hand at the front`,
+  sMove:(n,i,f)=>`Move ${n} (#${i}) ${f?"forward":"back"} one`,
+  sAbil:(n,i,t,ti)=>`${n} (#${i}) ability`+(t?` → ${t} (#${ti})`:""),
+  sEnd:"End turn",
+  wKill:(names,a,b)=>`Removes enemy ${names.join(", ")} right away, cutting them from ${a} to ${b} cars.`,
+  wTrade:n=>`Your ${n} is used up too, but a guaranteed kill matters more when you're driving them to zero.`,
+  wPlay:"Adds a car. The front is the farthest spot from the storm, so the new car is safe for a while.",
+  wDraw:"A bigger hand gives you cars to add and abilities to choose from next turn. Spare actions go to drawing by default.",
+  wScout:"Two cards for one action — an efficient draw.",
+  wNitro:n=>`${n} jumps to the front, as far from the storm as it gets.`,
+  wHook:n=>`Drags the enemy ${n} behind you, toward the storm.`,
+  wTow:n=>`Pulls your ${n} forward, away from the storm.`,
+  wOil:t=>`Slides ${t} directly behind you back 2 spaces, toward the storm.`,
+  wSmoke:"Swaps the cars ahead of and behind you to reorder the rear in your favour.",
+  wFwdEnemy:n=>`Pushes the enemy ${n} that was ahead of you behind you.`,
+  wFwd:n=>`Moves ${n} one space farther from the storm.`,
+  wBackEnemy:n=>`Lets the enemy ${n} behind you move up while you reposition your car.`,
+  wSwapOwn:"Reorders your own cars to put the more important one further ahead.",
+  wSetup:(n,s)=>`A setup move: it puts ${n} where it can use its ability next (${s}).`,
+  wRearFlip:(a,b)=>`Now the rear car the storm will take at end of turn changes from your ${a} to the enemy ${b}.`,
+  wRearArmor:"Puts your still-plated Armored car at the rear, so the storm strips its plating instead of taking a car.",
+  wRearSwap:(a,b)=>`Changes which of your cars the storm takes at the rear from ${a} to ${b}.`,
+  wPrep:"Prepares the next action.",
+  hitArmor:t=>`strips only the <b>plating</b> of ${t}`, hitEat:t=>`swallows <b>${t}</b>`,
+  sumWin:"🏁 This line wins the game <b>this turn</b>!",
+  sumNow:(h,a,b)=>`End your turn now and the storm ${h}: <b>you ${a} : them ${b}</b>.`,
+  sumPlan:(h,a,b,hn)=>`Follow the plan and the storm ${h}: <b>you ${a} : them ${b}</b>`+(hn?`, and your hand grows to ${hn}.`:"."),
+  sumNone:"No action improves things right now. Ending your turn is best.",
+  warn:n=>`⚠️ Your ${n} at the rear is in danger after the opponent's next turn — the storm takes it unless they move it.`,
+  tips:[
+    "Key idea: the <b>rearmost car</b> disappears when a turn ends. End your turn with an enemy car at the rear.",
+    "Cars are your health. Placing a car at the front adds 1.",
+    "Got a spare action? At least draw. Your hand is next turn's weapon.",
+    "Kill abilities like Rammer and Mortar need the right spot. Set up your position early.",
+    "Armored survives the storm once, so it can sit at the rear for a turn.",
+  ],
+  coachHd:"🧭 Coach's pick", coachMeta:(n,o)=>`${n} action${n>1?"s":""} left · ${o?"hide ▲":"show why ▼"}`,
+  coachGo:l=>`Do step 1: ${l}`,
+},
+ko: {
+  title:"샌드스톰 랠리", sub:"WebAssembly 카드 레이스 · 모래폭풍에서 살아남기", pageTitle:"샌드스톰 랠리 — WASM 카드 게임",
+  langBtn:"🌐 English", coach:"🧭 코치", rules:"규칙", close:"닫기",
+  types:[
+    ["충각차","바로 앞의 적 차량을 들이받아 파괴"],
+    ["작살차","앞쪽 3칸 안의 적 차량을 내 바로 뒤로 끌어옴"],
+    ["니트로","단숨에 선두로 이동"],
+    ["오일차","바로 뒤 차량을 2칸 뒤로 미끄러뜨림"],
+    ["견인차","아군 차량 하나를 내 바로 뒤로 데려옴"],
+    ["박격포","선두 2칸 안에서 사용: 후방 절반의 적 1대 파괴 (사용 후 이 차도 소모)"],
+    ["장갑차","패시브: 폭풍을 한 번 버팀"],
+    ["정찰차","카드 2장 뽑기"],
+    ["연막차","내 바로 앞과 바로 뒤 차량의 자리를 바꿈"],
+  ],
+  rulesHtml:`<h2>규칙</h2>
   <p>두 레이싱 팀이 일렬로 달리며 뒤에서 덮쳐오는 모래폭풍을 피합니다. <b>상대 팀 차를 모두 잃게 만들면 승리!</b></p>
   <ul>
     <li>차량 행렬은 위가 <b>선두</b>, 아래가 <b>후미</b>입니다.</li>
     <li>내 턴에 <b>행동 3번</b>을 아래에서 자유롭게 씁니다.<br>· 카드 뽑기 (손패 최대 3장)<br>· 손패의 차를 <b>선두</b>에 배치<br>· 내 차를 한 칸 앞/뒤로 이동 (자리 교환)<br>· 내 차의 능력 사용 (차마다 턴당 1번)</li>
     <li>턴이 끝나면 폭풍이 <b>맨 뒤 차량 1대</b>를 삼킵니다.</li>
     <li>폭풍이 지나간 뒤 행렬에 차가 없는 팀이 패배합니다.</li>
-  </ul>
-  <div class="types" id="typesList"></div>
-  <p style="color:var(--muted);font-size:12px">카드 레이스 보드게임의 메커니즘에서 영감을 받은 오리지널 구현입니다. 게임 로직과 AI는 C로 작성해 WebAssembly로 컴파일했습니다.</p>
-  <button class="btn" style="width:100%" onclick="closeM('rules')">닫기</button>
-</div></div>
+  </ul>`,
+  rulesNote:"카드 레이스 보드게임의 메커니즘에서 영감을 받은 오리지널 구현입니다. 게임 로직과 AI는 C로 작성해 WebAssembly로 컴파일했습니다.",
+  who:(p,hot)=> hot ? (p===0?"파랑 팀":"빨강 팀") : (p===0?"나":"AI"),
+  whoTag:(p,hot)=> hot ? (p===0?"파랑":"빨강") : (p===0?"나":"AI"),
+  turnLine:(t,w)=>`${t}턴 · ${w} 차례`,
+  gameOver:"게임 종료",
+  deckLine:(n,w)=>`덱 ${n}장 · ${w} 손패`,
+  front:"▲ 선두", storm:"▼ 모래폭풍 ▼",
+  tagArmor:"장갑", tagUsed:"사용함",
+  logStart:"게임 시작! 내 차량을 눌러 행동을 고르세요.",
+  emptyHand:"손패가 비었어요 — 카드를 뽑아보세요",
+  pickTarget:n=>`${n}: 대상을 고르세요 (빨간 테두리)`,
+  cancel:"취소", playQ:n=>`${eul(n)} 행렬 선두에 배치할까요?`, playBtn:"선두에 배치",
+  selected:n=>`${n} 선택됨`, up:"▲ 앞으로", down:"▼ 뒤로", ability:"⚡ 능력",
+  thinking:w=>`${iga(w)} 생각 중…`,
+  actsLeft:n=>`행동 ${n}번 남음 · 내 차량이나 손패를 누르세요`,
+  noActs:"행동을 다 썼어요 — 턴을 끝내세요",
+  drawBtn:"🂠 카드 뽑기", endBtn:"턴 종료 🌪️",
+  lDraw:p=>`${p}: 카드 뽑기`, lPlay:(p,n)=>`${p}: ${n} 선두 배치`,
+  lMove:(p,n,f)=>`${p}: ${n} ${f?"앞으로":"뒤로"} 이동`, lAbil:(p,n,t)=>`${p}: ${n} 능력${t?" → "+t:""}`, lEnd:p=>`${p}: 턴 종료`,
+  stormArmor:"🌪️ 폭풍이 장갑차의 장갑을 벗겨냄",
+  stormEat:(w,n)=>`🌪️ 폭풍이 ${w}의 ${eul(n)} 삼킴`,
+  stormNone:"🌪️ 폭풍이 지나감",
+  firstGo:w=>`${w} 먼저 출발!`,
+  winHot:w=>`${w} 승리! 🏁`, win:"승리! 🏁", lose:"패배… 🌪️",
+  endHot:t=>`${t}턴 만에 결판이 났어요.`, endWin:t=>`${t}턴 만에 AI 팀을 폭풍 속으로 밀어 넣었어요.`,
+  endLose:"AI 팀이 끝까지 살아남았어요. 다시 도전해 보세요!",
+  againAI:"다시 하기 (AI 대전)", againHot:"2인 핫시트",
+  owned:(n,mine)=> (mine?"내 ":"상대 ")+n,
+  sDraw:"카드 뽑기", sPlay:n=>`손패의 ${eul(n)} 선두에 배치`,
+  sMove:(n,i,f)=>`${n}(${i}번) ${f?"앞으로":"뒤로"} 한 칸`,
+  sAbil:(n,i,t,ti)=>`${n}(${i}번) 능력`+(t?` → ${t}(${ti}번)`:""),
+  sEnd:"턴 종료",
+  wKill:(names,a,b)=>`상대 ${names.map(eul).join(", ")} 즉시 제거해서 상대 차가 ${a}대 → ${b}대로 줄어요.`,
+  wTrade:n=>`${eun(n)} 함께 소모되지만, 상대를 0대로 몰아가는 데엔 확실한 1대 제거가 더 값져요.`,
+  wPlay:"차가 1대 늘어요. 선두는 폭풍에서 가장 먼 자리라 새 차가 한동안 안전해요.",
+  wDraw:"손패가 늘면 다음 턴에 차를 보충하거나 능력을 고를 선택지가 생겨요. 남는 행동은 뽑기에 쓰는 게 기본이에요.",
+  wScout:"행동 1번으로 카드 2장을 얻는, 효율 좋은 뽑기예요.",
+  wNitro:n=>`${eun(n)} 단숨에 선두로 가서 폭풍에서 가장 멀어져요.`,
+  wHook:n=>`${eul("상대 "+n)} 내 뒤로 끌어와 폭풍 쪽으로 보내요.`,
+  wTow:n=>`내 ${eul(n)} 앞쪽으로 끌어와 폭풍에서 떼어놔요.`,
+  wOil:t=>`바로 뒤의 ${eul(t)} 2칸 뒤로 밀어 폭풍 쪽으로 보내요.`,
+  wSmoke:"앞뒤 차의 자리를 바꿔 맨 뒤 순서를 내게 유리하게 만들어요.",
+  wFwdEnemy:n=>`앞에 있던 ${eul("상대 "+n)} 내 뒤로 밀어내요.`,
+  wFwd:n=>`${eul(n)} 폭풍에서 한 칸 멀리 떨어뜨려요.`,
+  wBackEnemy:n=>`뒤에 있던 ${eul("상대 "+n)} 앞으로 보내는 대신 내 차 위치를 조정해요.`,
+  wSwapOwn:"내 차끼리 순서를 바꿔 더 중요한 차를 앞쪽에 둬요.",
+  wSetup:(n,s)=>`다음 단계에서 ${n} 능력을 쓸 수 있는 자리를 만드는 준비 동작이에요 (${s}).`,
+  wRearFlip:(a,b)=>`이제 턴이 끝날 때 폭풍에 삼켜질 맨 뒤 차가 내 ${a} → 상대 ${iga(b)} 돼요.`,
+  wRearArmor:"장갑이 남은 내 장갑차를 맨 뒤에 둬서, 폭풍이 차 대신 장갑만 벗겨가게 해요.",
+  wRearSwap:(a,b)=>`폭풍에 내줄 맨 뒤 차를 ${a}에서 ${b}(으)로 바꿔요.`,
+  wPrep:"다음 행동을 위한 준비예요.",
+  hitArmor:t=>`${t}의 <b>장갑만</b> 벗겨내서`, hitEat:t=>`<b>${eul(t)}</b> 삼켜서`,
+  sumWin:"🏁 이 수순이면 이번 턴에 바로 <b>승리</b>해요!",
+  sumNow:(h,a,b)=>`지금 바로 턴을 끝내면 폭풍이 ${h} <b>나 ${a} : 상대 ${b}</b>.`,
+  sumPlan:(h,a,b,hn)=>`추천대로 하면 폭풍이 ${h} <b>나 ${a} : 상대 ${b}</b>`+(hn?`, 손패도 ${hn}장으로 늘어요.`:"."),
+  sumNone:"지금은 행동을 써도 상황이 나아지지 않아요. 바로 턴을 끝내는 게 최선이에요.",
+  warn:n=>`⚠️ 다음 상대 턴이 끝나면 맨 뒤의 내 ${eun(n)} 위험해요 — 상대가 손대지 않으면 폭풍에 삼켜져요.`,
+  tips:[
+    "핵심 원리: 턴이 끝날 때 <b>맨 뒤 차</b>가 사라져요. 맨 뒤에 상대 차를 두고 턴을 끝내는 게 기본이에요.",
+    "차 수가 곧 체력이에요. 선두에 차를 배치하면 체력이 1 늘어요.",
+    "행동이 남으면 카드 뽑기라도 하세요. 손패는 다음 턴의 무기예요.",
+    "충각차·박격포처럼 차를 바로 없애는 능력은 자리 조건이 있어요. 미리 자리를 잡아두세요.",
+    "장갑차는 폭풍을 한 번 버티니 맨 뒤에 둬도 한 턴은 안전해요.",
+  ],
+  coachHd:"🧭 코치 추천", coachMeta:(n,o)=>`남은 행동 ${n}번 · ${o?"접기 ▲":"설명 보기 ▼"}`,
+  coachGo:l=>`추천 1단계 실행: ${l}`,
+}};
 
-<div class="modal" id="endM"><div class="sheet end">
-  <h2 id="endTitle"></h2><p id="endText"></p>
-  <div class="mode"><button class="btn" onclick="start(0)">다시 하기 (AI 대전)</button><button class="btn ghost" onclick="start(1)">2인 핫시트</button></div>
-</div></div>
+let lang = "en";
+try { const v = localStorage.getItem("sandstorm-rally-lang"); if(v==="ko"||v==="en") lang = v; } catch(e){}
+const L = () => I18N[lang];
+const TN = t => L().types[t][0], TD = t => L().types[t][1];
 
-<script>
-const WASM_B64 = "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AkAgACgCeCIJQQFIDQAgCUEDcSEDAkACQCAJQQRPDQBBACEEQQAhAQwBCyAAQRBqIQIgCUH8////B3EhCEEAIQRBACEBA0AgASACQXFqLQAARWogAkF2ai0AAEVqIAJBe2otAABFaiACLQAARWohASACQRRqIQIgCCAEQQRqIgRHDQALCwJAIANFDQAgBEEFbCAAakEBaiECA0AgASACLQAARWohASACQQVqIQIgA0F/aiIDDQALCyABDQELIAAoAoQBDQAgACgCrAFBf0oNACAAQQE2AqwBCwJAIAlBAUgNACAJQQNxIQMCQAJAIAlBBE8NAEEAIQRBACEBDAELIABBEGohAiAJQfz///8HcSEIQQAhBEEAIQEDQCABIAJBcWotAABBAUZqIAJBdmotAABBAUZqIAJBe2otAABBAUZqIAItAABBAUZqIQEgAkEUaiECIAggBEEEaiIERw0ACwsCQCADRQ0AIARBBWwgAGpBAWohAgNAIAEgAi0AAEEBRmohASACQQVqIQIgA0F/aiIDDQALCyABDQMLIABBiAFqKAIADQIgACgCrAFBf0oNAiAAQQA2AqwBDAILIAdBA3EhAwJAAkAgB0EETw0AQQAhBEEAIQEMAQsgAEEQaiECIAdBfHEhCEEAIQRBACEBA0AgASACQXFqLQAARWogAkF2ai0AAEVqIAJBe2otAABFaiACLQAARWohASACQRRqIQIgCCAEQQRqIgRHDQALCwJAIANFDQAgBEEFbCAAakEBaiECA0AgASACLQAARWohASACQQVqIQIgA0F/aiIDDQALCyAHQQNxIQQCQAJAIAdBBE8NAEEAIQhBACEDDAELIABBEGohAiAHQXxxIQlBACEIQQAhAwNAIAMgAkFxai0AAEEBRmogAkF2ai0AAEEBRmogAkF7ai0AAEEBRmogAi0AAEEBRmohAyACQRRqIQIgCSAIQQRqIghHDQALCwJAIARFDQAgCEEFbCAAakEBaiECA0AgAyACLQAAQQFGaiEDIAJBBWohAiAEQX9qIgQNAAsLIANFIQMgAUUhAgsCQCAAKAKsAUF/Sg0AAkACQCACIANxQQFHDQBBASAGayECDAELIAIgA3JBAUcNAQsgACACNgKsAQsgAEEDNgKoASAAQQEgBms2AqQBIAAgACgCsAFBAWo2ArABIAdBAUgNACAHQQdx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";
-const A = {DRAW:0, PLAY:1, MOVE:2, ABIL:3, END:4};
-const TYPES = [
-  {n:"충각차", d:"바로 앞의 적 차량을 들이받아 파괴", g:"ram"},
-  {n:"작살차", d:"앞쪽 3칸 안의 적 차량을 내 바로 뒤로 끌어옴", g:"hook", tgt:1},
-  {n:"니트로", d:"단숨에 선두로 이동", g:"nitro"},
-  {n:"오일차", d:"바로 뒤 차량을 2칸 뒤로 미끄러뜨림", g:"oil"},
-  {n:"견인차", d:"아군 차량 하나를 내 바로 뒤로 데려옴", g:"tow", tgt:1},
-  {n:"박격포", d:"선두 2칸 안에서 사용: 후방 절반의 적 1대 파괴 (사용 후 이 차도 소모)", g:"mortar", tgt:1},
-  {n:"장갑차", d:"패시브: 폭풍을 한 번 버팀", g:"armor", passive:1},
-  {n:"정찰차", d:"카드 2장 뽑기", g:"scout"},
-  {n:"연막차", d:"내 바로 앞과 바로 뒤 차량의 자리를 바꿈", g:"smoke"},
-];
 // Original simple car glyphs: a body + type mark
 function glyph(t){
   const body = `<path d="M3 20h34v-6l-5-6H14l-5 6H3z" fill="currentColor" opacity=".9"/><circle cx="11" cy="22" r="4" fill="#2b2118"/><circle cx="29" cy="22" r="4" fill="#2b2118"/>`;
@@ -169,12 +351,12 @@ function glyph(t){
     scout:`<circle cx="22" cy="5" r="3" fill="none" stroke="#2b2118" stroke-width="1.6"/><path d="M22 8v2" stroke="#2b2118" stroke-width="1.6"/>`,
     smoke:`<circle cx="3" cy="9" r="2.5" fill="#9a8a76"/><circle cx="7" cy="5" r="3" fill="#b3a490"/>`,
   };
-  return `<svg viewBox="0 0 40 28" aria-hidden="true">${body}${marks[TYPES[t].g]}</svg>`;
+  return `<svg viewBox="0 0 40 28" aria-hidden="true">${body}${marks[GLYPHS[t]]}</svg>`;
 }
 
 let E, S = null, mode = 0, sel = null, handSel = null, targeting = null, busy = false, logs = [];
 const $ = id => document.getElementById(id);
-const who = p => mode === 1 ? (p === 0 ? "파랑 팀" : "빨강 팀") : (p === 0 ? "나" : "AI");
+const who = p => L().who(p, mode===1);
 
 function readState(){
   const s = new Int32Array(E.memory.buffer, E.state(), 14 + 24*5);
@@ -185,19 +367,18 @@ function readState(){
 }
 const human = () => mode === 1 || S.cur === 0;
 
-function log(msg){ logs.unshift(msg); logs = logs.slice(0,4); }
+// Log entries are stored as functions so they re-render in the current language.
+function log(fn){ logs.unshift(fn); logs = logs.slice(0,4); }
 
 function describe(st, k, a, b){
-  const p = who(st.cur);
-  if(k===A.DRAW) return `${p}: 카드 뽑기`;
-  if(k===A.PLAY) return `${p}: ${st.hand[st.cur][a] >= 0 ? TYPES[st.hand[st.cur][a]].n : "차량"} 선두 배치`;
-  if(k===A.MOVE) return `${p}: ${TYPES[st.cars[a].type].n} ${b===0?"앞으로":"뒤로"} 이동`;
-  if(k===A.ABIL){
-    const c = TYPES[st.cars[a].type].n;
-    const t = b>=0 && st.cars[b] ? ` → ${TYPES[st.cars[b].type].n}` : "";
-    return `${p}: ${c} 능력${t}`;
-  }
-  return `${p}: 턴 종료`;
+  const p = st.cur, h = mode===1;
+  const W = () => L().who(p,h);
+  if(k===A.DRAW) return () => L().lDraw(W());
+  if(k===A.PLAY){ const t = st.hand[p][a]; return () => L().lPlay(W(), TN(t)); }
+  if(k===A.MOVE){ const t = st.cars[a].type; return () => L().lMove(W(), TN(t), b===0); }
+  if(k===A.ABIL){ const t = st.cars[a].type, tt = b>=0 && st.cars[b] ? st.cars[b].type : -1;
+    return () => L().lAbil(W(), TN(t), tt>=0 ? TN(tt) : ""); }
+  return () => L().lEnd(W());
 }
 
 function doAct(k,a=0,b=0){
@@ -205,9 +386,10 @@ function doAct(k,a=0,b=0){
   if(!E.act(k,a,b)) return false;
   if(k===A.END){
     const after = readState();
-    const rear = before.cars[before.len-1];
-    let m = `🌪️ 폭풍이 ${before.len? (after.len===before.len ? `장갑차의 장갑을 벗겨냄` : `${who(rear.owner)}의 ${TYPES[rear.type].n}을(를) 삼킴`) : "지나감"}`;
-    log(m);
+    const rear = before.cars[before.len-1], h = mode===1;
+    if(!before.len) log(() => L().stormNone);
+    else if(after.len===before.len) log(() => L().stormArmor);
+    else log(() => L().stormEat(L().who(rear.owner,h), TN(rear.type)));
   } else log(describe(before,k,a,b));
   sel = null; handSel = null; targeting = null;
   S = readState();
@@ -217,41 +399,53 @@ function doAct(k,a=0,b=0){
   return true;
 }
 
+function applyStatic(){
+  const T = L();
+  document.documentElement.lang = lang;
+  document.title = T.pageTitle;
+  $("tTitle").textContent = T.title; $("tSub").textContent = T.sub;
+  $("langBtn").textContent = T.langBtn;
+  $("coachBtn").textContent = T.coach; $("rulesBtn").textContent = T.rules;
+  $("rulesBody").innerHTML = T.rulesHtml; $("rulesNote").textContent = T.rulesNote; $("rulesClose").textContent = T.close;
+  $("typesList").innerHTML = T.types.map((t,i)=>`<div>${glyph(i)}<span><b>${t[0]}</b> — ${t[1]}</span></div>`).join("");
+  $("againAI").textContent = T.againAI; $("againHot").textContent = T.againHot;
+}
+
 function render(flashIdx=-1){
+  const T = L();
   const me = mode===1 ? S.cur : 0;
   const t = $("turn");
-  t.textContent = S.winner>=0 ? "게임 종료" : `${S.turn}턴 · ${who(S.cur)} 차례`;
+  t.textContent = S.winner>=0 ? T.gameOver : T.turnLine(S.turn, who(S.cur));
   t.className = "turn " + (S.cur===0 ? "me" : "ai");
   $("pips").innerHTML = [0,1,2].map(i=>`<span class="pip ${i<S.actions?"on":""}"></span>`).join("");
   const opp = mode===1 ? 1-S.cur : 1;
-  $("deck").textContent = `덱 ${S.dn}장 · ${who(opp)} 손패`;
+  $("deck").textContent = T.deckLine(S.dn, who(opp));
   $("aihand").innerHTML = "<i></i>".repeat(S.hn[opp]) || "<span>0</span>";
 
-  let h = `<div class="flag">▲ 선두</div>`;
+  let h = `<div class="flag">${T.front}</div>`;
   S.cars.forEach((c,i)=>{
-    const ty = TYPES[c.type];
     let cls = `car o${c.owner}`;
     if(sel===i) cls += " sel";
     if(targeting!==null && E.can(A.ABIL, targeting, i)) cls += " tgt";
     if(c.used) cls += " used";
     if(i===flashIdx) cls += " flash";
-    const badges = (c.type===6 && c.armor ? `<span class="tag">장갑</span>` : "") + (c.used ? `<span class="tag">사용함</span>` : "");
+    const badges = (c.type===6 && c.armor ? `<span class="tag">${T.tagArmor}</span>` : "") + (c.used ? `<span class="tag">${T.tagUsed}</span>` : "");
     h += `<div class="${cls}" data-i="${i}">
       <div class="pos">${i+1}</div>
       <div class="ic">${glyph(c.type)}</div>
-      <div class="tx"><div class="nm">${ty.n}<span class="tag who${c.owner}">${who(c.owner)}</span>${badges}</div><div class="ds">${ty.d}</div></div>
+      <div class="tx"><div class="nm">${TN(c.type)}<span class="tag who${c.owner}">${T.whoTag(c.owner, mode===1)}</span>${badges}</div><div class="ds">${TD(c.type)}</div></div>
     </div>`;
   });
-  h += `<div class="storm"><span>▼ 모래폭풍 ▼</span></div>`;
+  h += `<div class="storm"><span>${T.storm}</span></div>`;
   $("road").innerHTML = h;
   $("road").querySelectorAll(".car").forEach(el=>el.onclick=()=>tapCar(+el.dataset.i));
-  $("log").innerHTML = logs.map(l=>`<div>${l}</div>`).join("") || "<div>게임 시작! 내 차량을 눌러 행동을 고르세요.</div>";
+  $("log").innerHTML = logs.map(l=>`<div>${l()}</div>`).join("") || `<div>${T.logStart}</div>`;
 
   // Hand
   const hand = S.hand[me];
   const hb = $("hand");
-  hb.innerHTML = hand.length ? hand.map((t,i)=>`<div class="hc ${handSel===i?"sel":""}" data-h="${i}"><div class="nm">${glyph(t)}${TYPES[t].n}</div><div class="ds">${TYPES[t].d}</div></div>`).join("")
-    : `<div class="empty">손패가 비었어요 — 카드를 뽑아보세요</div>`;
+  hb.innerHTML = hand.length ? hand.map((t,i)=>`<div class="hc ${handSel===i?"sel":""}" data-h="${i}"><div class="nm">${glyph(t)}${TN(t)}</div><div class="ds">${TD(t)}</div></div>`).join("")
+    : `<div class="empty">${T.emptyHand}</div>`;
   hb.querySelectorAll(".hc").forEach(el=>el.onclick=()=>{ if(!human()||busy) return; handSel = handSel===+el.dataset.h?null:+el.dataset.h; sel=null; targeting=null; render(); });
   hb.querySelectorAll(".hc svg").forEach(s=>s.style.color = me===0 ? "var(--me)" : "var(--ai)");
 
@@ -259,29 +453,28 @@ function render(flashIdx=-1){
   const ctl = $("ctl"); let hint = "";
   const can = human() && !busy && S.winner<0;
   if(targeting!==null){
-    hint = `${TYPES[S.cars[targeting].type].n}: 대상을 고르세요 (빨간 테두리)`;
-    ctl.innerHTML = `<button class="btn" id="cancel">취소</button>`;
+    hint = T.pickTarget(TN(S.cars[targeting].type));
+    ctl.innerHTML = `<button class="btn" id="cancel">${T.cancel}</button>`;
     $("cancel").onclick=()=>{targeting=null;render();};
   } else if(handSel!==null){
-    hint = `${TYPES[hand[handSel]].n}을(를) 행렬 선두에 배치할까요?`;
-    ctl.innerHTML = `<button class="btn" id="cancel">취소</button><button class="btn pri" id="play" ${E.can(A.PLAY,handSel,0)&&can?"":"disabled"}>선두에 배치</button>`;
+    hint = T.playQ(TN(hand[handSel]));
+    ctl.innerHTML = `<button class="btn" id="cancel">${T.cancel}</button><button class="btn pri" id="play" ${E.can(A.PLAY,handSel,0)&&can?"":"disabled"}>${T.playBtn}</button>`;
     $("cancel").onclick=()=>{handSel=null;render();};
     $("play").onclick=()=>doAct(A.PLAY,handSel,0);
   } else if(sel!==null){
-    const c = S.cars[sel], ty = TYPES[c.type];
-    const abil = ty.passive ? false : ty.tgt ? S.cars.some((_,j)=>E.can(A.ABIL,sel,j)) : E.can(A.ABIL,sel,-1);
-    hint = `${ty.n} 선택됨`;
-    ctl.innerHTML = `<button class="btn" id="up" ${E.can(A.MOVE,sel,0)&&can?"":"disabled"}>▲ 앞으로</button>
-      <button class="btn" id="dn" ${E.can(A.MOVE,sel,1)&&can?"":"disabled"}>▼ 뒤로</button>
-      <button class="btn pri" id="ab" ${abil&&can?"":"disabled"}>⚡ 능력</button>`;
+    const c = S.cars[sel], fl = TFLAGS[c.type];
+    const abil = fl.passive ? false : fl.tgt ? S.cars.some((_,j)=>E.can(A.ABIL,sel,j)) : E.can(A.ABIL,sel,-1);
+    hint = T.selected(TN(c.type));
+    ctl.innerHTML = `<button class="btn" id="up" ${E.can(A.MOVE,sel,0)&&can?"":"disabled"}>${T.up}</button>
+      <button class="btn" id="dn" ${E.can(A.MOVE,sel,1)&&can?"":"disabled"}>${T.down}</button>
+      <button class="btn pri" id="ab" ${abil&&can?"":"disabled"}>${T.ability}</button>`;
     $("up").onclick=()=>doAct(A.MOVE,sel,0);
     $("dn").onclick=()=>doAct(A.MOVE,sel,1);
-    $("ab").onclick=()=>{ if(ty.tgt){ targeting=sel; sel=null; render(); } else doAct(A.ABIL,sel,-1); };
+    $("ab").onclick=()=>{ if(fl.tgt){ targeting=sel; sel=null; render(); } else doAct(A.ABIL,sel,-1); };
   } else {
-    hint = !can ? (S.winner>=0 ? "" : `${who(S.cur)}이(가) 생각 중…`) :
-      S.actions>0 ? `행동 ${S.actions}번 남음 · 내 차량이나 손패를 누르세요` : "행동을 다 썼어요 — 턴을 끝내세요";
-    ctl.innerHTML = `<button class="btn" id="draw" ${E.can(A.DRAW,0,0)&&can?"":"disabled"}>🂠 카드 뽑기</button>
-      <button class="btn pri" id="end" ${can?"":"disabled"}>턴 종료 🌪️</button>`;
+    hint = !can ? (S.winner>=0 ? "" : T.thinking(who(S.cur))) : S.actions>0 ? T.actsLeft(S.actions) : T.noActs;
+    ctl.innerHTML = `<button class="btn" id="draw" ${E.can(A.DRAW,0,0)&&can?"":"disabled"}>${T.drawBtn}</button>
+      <button class="btn pri" id="end" ${can?"":"disabled"}>${T.endBtn}</button>`;
     $("draw").onclick=()=>doAct(A.DRAW);
     $("end").onclick=()=>endTurn();
   }
@@ -320,141 +513,128 @@ async function aiTurn(){
 const wait = ms => new Promise(r=>setTimeout(r,ms));
 
 function showEnd(){
-  const w = S.winner;
-  $("endTitle").textContent = mode===1 ? `${who(w)} 승리! 🏁` : (w===0 ? "승리! 🏁" : "패배… 🌪️");
-  $("endText").textContent = mode===1 ? `${S.turn-1}턴 만에 결판이 났어요.` : (w===0 ? `${S.turn-1}턴 만에 AI 팀을 폭풍 속으로 밀어 넣었어요.` : "AI 팀이 끝까지 살아남았어요. 다시 도전해 보세요!");
+  const T = L(), w = S.winner;
+  $("endTitle").textContent = mode===1 ? T.winHot(who(w)) : (w===0 ? T.win : T.lose);
+  $("endText").textContent = mode===1 ? T.endHot(S.turn-1) : (w===0 ? T.endWin(S.turn-1) : T.endLose);
   $("endM").classList.add("show");
 }
 
 // ---------------- Coach ----------------
 let coachOn = true, coachOpen = true, coachCache = {key:"", data:null};
-const nm = c => TYPES[c.type].n;
-const josa = (w, a, b) => { const ch = w.charCodeAt(w.length-1); return ((ch-0xac00)%28 ? a : b); }; // 받침 유무
-const eul = w => w + josa(w,"을","를"), iga = w => w + josa(w,"이","가"), eun = w => w + josa(w,"은","는");
-const owned = (c, me) => (c.owner===me ? "내 " : "상대 ") + nm(c);
+const nm = c => TN(c.type);
+const owned = (c, me) => L().owned(nm(c), c.owner===me);
 const rearOf = st => st.cars[st.len-1];
 const cnt = (st,p) => st.cars.filter(c=>c.owner===p).length;
 const idxOf = (st,id) => st.cars.findIndex(c=>c.id===id);
 
 function stepLabel(st,k,a,b,me){
-  if(k===A.DRAW) return "카드 뽑기";
-  if(k===A.PLAY) return `손패의 ${eul(TYPES[st.hand[me][a]].n)} 선두에 배치`;
-  if(k===A.MOVE) return `${nm(st.cars[a])}(${a+1}번) ${b===0?"앞으로":"뒤로"} 한 칸`;
+  const T = L();
+  if(k===A.DRAW) return T.sDraw;
+  if(k===A.PLAY) return T.sPlay(TN(st.hand[me][a]));
+  if(k===A.MOVE) return T.sMove(nm(st.cars[a]), a+1, b===0);
   if(k===A.ABIL){
     const c = st.cars[a];
     const ti = c.type===0 ? a-1 : c.type===3 ? a+1 : b;
     const t = ti>=0 ? st.cars[ti] : null;
-    return `${nm(c)}(${a+1}번) 능력` + (t ? ` → ${owned(t,me)}(${ti+1}번)` : "");
+    return T.sAbil(nm(c), a+1, t ? owned(t,me) : "", ti+1);
   }
-  return "턴 종료";
+  return T.sEnd;
 }
 
 // Why is this step good? Compare the board right before and right after it.
 function stepWhy(bf, af, k, a, b, me, later){
-  const why = [];
+  const T = L(), why = [];
   const gone = bf.cars.filter(c => idxOf(af,c.id) < 0);
   const goneOpp = gone.filter(c=>c.owner!==me), goneMine = gone.filter(c=>c.owner===me);
   const actor = (k===A.MOVE||k===A.ABIL) ? bf.cars[a] : null;
   const setsUp = actor && later.some(s => s.k===A.ABIL && s.actorId===actor.id);
 
   if(goneOpp.length){
-    why.push(`상대 ${goneOpp.map(c=>eul(nm(c))).join(", ")} 즉시 제거해서 상대 차가 ${cnt(bf,1-me)}대 → ${cnt(af,1-me)}대로 줄어요.`);
-    if(goneMine.length) why.push(`${eun(nm(goneMine[0]))} 함께 소모되지만, 상대를 0대로 몰아가는 데엔 확실한 1대 제거가 더 값져요.`);
+    why.push(T.wKill(goneOpp.map(nm), cnt(bf,1-me), cnt(af,1-me)));
+    if(goneMine.length) why.push(T.wTrade(nm(goneMine[0])));
   }
-  if(k===A.PLAY) why.push("차가 1대 늘어요. 선두는 폭풍에서 가장 먼 자리라 새 차가 한동안 안전해요.");
-  if(k===A.DRAW) why.push("손패가 늘면 다음 턴에 차를 보충하거나 능력을 고를 선택지가 생겨요. 남는 행동은 뽑기에 쓰는 게 기본이에요.");
-  if(k===A.ABIL && actor.type===7) why.push("행동 1번으로 카드 2장을 얻는, 효율 좋은 뽑기예요.");
-  if(k===A.ABIL && actor.type===2) why.push(`${eun(nm(actor))} 단숨에 선두로 가서 폭풍에서 가장 멀어져요.`);
-  if(k===A.ABIL && actor.type===1) { const t=bf.cars[b]; why.push(`${eul("상대 "+nm(t))} 내 뒤로 끌어와 폭풍 쪽으로 보내요.`); }
-  if(k===A.ABIL && actor.type===4) { const t=bf.cars[b]; why.push(`내 ${eul(nm(t))} 앞쪽으로 끌어와 폭풍에서 떼어놔요.`); }
-  if(k===A.ABIL && actor.type===3) { const t=bf.cars[a+1]; why.push(`바로 뒤의 ${eul(owned(t,me))} 2칸 뒤로 밀어 폭풍 쪽으로 보내요.`); }
-  if(k===A.ABIL && actor.type===8) why.push("앞뒤 차의 자리를 바꿔 맨 뒤 순서를 내게 유리하게 만들어요.");
+  if(k===A.PLAY) why.push(T.wPlay);
+  if(k===A.DRAW) why.push(T.wDraw);
+  if(k===A.ABIL && actor.type===7) why.push(T.wScout);
+  if(k===A.ABIL && actor.type===2) why.push(T.wNitro(nm(actor)));
+  if(k===A.ABIL && actor.type===1) why.push(T.wHook(nm(bf.cars[b])));
+  if(k===A.ABIL && actor.type===4) why.push(T.wTow(nm(bf.cars[b])));
+  if(k===A.ABIL && actor.type===3) why.push(T.wOil(owned(bf.cars[a+1],me)));
+  if(k===A.ABIL && actor.type===8) why.push(T.wSmoke);
   if(k===A.MOVE){
     const other = bf.cars[b===0 ? a-1 : a+1];
-    if(b===0 && other.owner!==me) why.push(`앞에 있던 ${eul("상대 "+nm(other))} 내 뒤로 밀어내요.`);
-    else if(b===0) why.push(`${eul(nm(actor))} 폭풍에서 한 칸 멀리 떨어뜨려요.`);
-    else if(other.owner!==me) why.push(`뒤에 있던 ${eul("상대 "+nm(other))} 앞으로 보내는 대신 내 차 위치를 조정해요.`);
-    else why.push("내 차끼리 순서를 바꿔 더 중요한 차를 앞쪽에 둬요.");
+    if(b===0 && other.owner!==me) why.push(T.wFwdEnemy(nm(other)));
+    else if(b===0) why.push(T.wFwd(nm(actor)));
+    else if(other.owner!==me) why.push(T.wBackEnemy(nm(other)));
+    else why.push(T.wSwapOwn);
   }
   if(setsUp){
     const nxt = later.find(s=>s.k===A.ABIL && s.actorId===actor.id);
-    why.push(`다음 단계에서 ${nm(actor)} 능력을 쓸 수 있는 자리를 만드는 준비 동작이에요 (${nxt.short}).`);
+    why.push(T.wSetup(nm(actor), nxt.label));
   }
   // Effect on who the storm will take at the end of this turn
   const r0 = rearOf(bf), r1 = rearOf(af);
   if(r0 && r1 && r0.id!==r1.id && k!==A.PLAY && k!==A.DRAW){
-    if(r0.owner===me && r1.owner!==me) why.push(`이제 턴이 끝날 때 폭풍에 삼켜질 맨 뒤 차가 내 ${nm(r0)} → 상대 ${iga(nm(r1))} 돼요.`);
-    else if(r1.owner===me && r1.type===6 && r1.armor) why.push(`장갑이 남은 내 장갑차를 맨 뒤에 둬서, 폭풍이 차 대신 장갑만 벗겨가게 해요.`);
-    else if(r1.owner===me && r0.owner===me) why.push(`폭풍에 내줄 맨 뒤 차를 ${nm(r0)}에서 ${nm(r1)}(으)로 바꿔요.`);
+    if(r0.owner===me && r1.owner!==me) why.push(T.wRearFlip(nm(r0), nm(r1)));
+    else if(r1.owner===me && r1.type===6 && r1.armor) why.push(T.wRearArmor);
+    else if(r1.owner===me && r0.owner===me) why.push(T.wRearSwap(nm(r0), nm(r1)));
   }
-  if(!why.length) why.push("다음 행동을 위한 준비예요.");
+  if(!why.length) why.push(T.wPrep);
   return why.join(" ");
 }
 
+// Simulate the coach's plan once; text is produced per language at render time.
 function buildCoach(){
   const me = S.cur;
   const o = new Int32Array(E.memory.buffer, E.coach(), 12);
   const n = o[0], plan = [];
   for(let i=0;i<n;i++) plan.push({k:o[3+i*3], a:o[4+i*3], b:o[5+i*3]});
   E.save();
-  // baseline: end the turn right now
   const start = readState();
   E.sim(A.END,0,0); const base = readState(); E.restore();
-  // walk the plan
+  E.save();
   const steps = []; let st = start;
   for(const p of plan){
     const actor = (p.k===A.MOVE||p.k===A.ABIL) ? st.cars[p.a] : null;
-    steps.push({...p, before:st, actorId: actor ? actor.id : -1, label: stepLabel(st,p.k,p.a,p.b,me)});
-    E.sim(p.k,p.a,p.b); st = readState(); steps[steps.length-1].after = st;
+    const s = {...p, before:st, actorId: actor ? actor.id : -1};
+    E.sim(p.k,p.a,p.b); st = readState(); s.after = st; steps.push(s);
   }
   const preStorm = st;
   E.sim(A.END,0,0); const fin = readState(); E.restore();
-  steps.forEach((s,i)=>{
-    s.short = s.label;
-    s.why = stepWhy(s.before, s.after, s.k, s.a, s.b, me, steps.slice(i+1).map(x=>({...x, short:x.label})));
-  });
-
-  // Summary: plan vs. ending now
-  const sum = [];
-  const rb = rearOf(start), rp = rearOf(preStorm);
-  const tag = c => c ? owned(c,me) : "없음";
-  const hit = c => (c.type===6 && c.armor) ? `${tag(c)}의 <b>장갑만</b> 벗겨내서` : `<b>${eul(tag(c))}</b> 삼켜서`;
-  if(fin.winner===me) sum.push("🏁 이 수순이면 이번 턴에 바로 <b>승리</b>해요!");
-  if(rb) sum.push(`지금 바로 턴을 끝내면 폭풍이 ${hit(rb)} <b>나 ${cnt(base,me)} : 상대 ${cnt(base,1-me)}</b>.`);
-  if(n && rp) sum.push(`추천대로 하면 폭풍이 ${hit(rp)} <b>나 ${cnt(fin,me)} : 상대 ${cnt(fin,1-me)}</b>` + (fin.hn[me]>start.hn[me] ? `, 손패도 ${fin.hn[me]}장으로 늘어요.` : "."));
-  if(!n) sum.push("지금은 행동을 써도 상황이 나아지지 않아요. 바로 턴을 끝내는 게 최선이에요.");
-  let warn = "";
-  if(fin.winner<0 && fin.len){
-    const r = rearOf(fin);
-    if(r.owner===me) warn = `⚠️ 다음 상대 턴이 끝나면 맨 뒤의 내 ${eun(nm(r))} 위험해요 — 상대가 손대지 않으면 폭풍에 삼켜져요.`;
-  }
-  return {plan, steps, sum, warn, me};
+  return {me, plan, steps, start, base, preStorm, fin};
 }
 
-const TIPS = [
-  "핵심 원리: 턴이 끝날 때 <b>맨 뒤 차</b>가 사라져요. 맨 뒤에 상대 차를 두고 턴을 끝내는 게 기본이에요.",
-  "차 수가 곧 체력이에요. 선두에 차를 배치하면 체력이 1 늘어요.",
-  "행동이 남으면 카드 뽑기라도 하세요. 손패는 다음 턴의 무기예요.",
-  "충각차·박격포처럼 차를 바로 없애는 능력은 자리 조건이 있어요. 미리 자리를 잡아두세요.",
-  "장갑차는 폭풍을 한 번 버티니 맨 뒤에 둬도 한 턴은 안전해요.",
-];
+function coachText(d){
+  const T = L(), me = d.me;
+  const steps = d.steps.map(s => ({...s, label: stepLabel(s.before,s.k,s.a,s.b,me)}));
+  steps.forEach((s,i) => s.why = stepWhy(s.before, s.after, s.k, s.a, s.b, me, steps.slice(i+1)));
+  const sum = [];
+  const rb = rearOf(d.start), rp = rearOf(d.preStorm);
+  const hit = c => (c.type===6 && c.armor) ? T.hitArmor(owned(c,me)) : T.hitEat(owned(c,me));
+  if(d.fin.winner===me) sum.push(T.sumWin);
+  if(rb) sum.push(T.sumNow(hit(rb), cnt(d.base,me), cnt(d.base,1-me)));
+  if(d.plan.length && rp) sum.push(T.sumPlan(hit(rp), cnt(d.fin,me), cnt(d.fin,1-me), d.fin.hn[me]>d.start.hn[me] ? d.fin.hn[me] : 0));
+  if(!d.plan.length) sum.push(T.sumNone);
+  let warn = "";
+  if(d.fin.winner<0 && d.fin.len){ const r = rearOf(d.fin); if(r.owner===me) warn = T.warn(nm(r)); }
+  return {steps, sum, warn};
+}
 
 function renderCoach(){
-  const box = $("coach");
+  const box = $("coach"), T = L();
   if(!coachOn || !S || S.winner>=0 || busy || !human() || targeting!==null){ box.hidden = true; return; }
   const key = JSON.stringify([S.turn,S.cur,S.actions,S.cars.map(c=>[c.id,c.used,c.armor]),S.hand]);
   if(coachCache.key!==key) coachCache = {key, data: buildCoach()};
-  const d = coachCache.data;
+  const d = coachCache.data, x = coachText(d);
   box.hidden = false;
-  const steps = d.steps.map((s,i)=>`<li class="${i===0?"now":""}"><b>${s.label}</b><span class="why">${s.why}</span></li>`).join("");
-  box.innerHTML = `<div class="hd" id="coachHd" style="cursor:pointer">🧭 코치 추천 <small>남은 행동 ${S.actions}번 · ${coachOpen?"접기 ▲":"설명 보기 ▼"}</small></div>
-    ${coachOpen ? `${d.plan.length ? `<ol>${steps}<li><b>턴 종료</b></li></ol>` : ""}
-    <div class="sum">${d.sum.join("<br>")}${d.warn?`<div class="warn">${d.warn}</div>`:""}</div>
-    <div class="tip">💡 ${TIPS[(S.turn+S.actions)%TIPS.length]}</div>` : ""}
-    <button class="btn go" id="coachGo">${d.plan.length ? "추천 1단계 실행: "+d.steps[0].label : "턴 종료"}</button>`;
+  const steps = x.steps.map((s,i)=>`<li class="${i===0?"now":""}"><b>${s.label}</b><span class="why">${s.why}</span></li>`).join("");
+  box.innerHTML = `<div class="hd" id="coachHd" style="cursor:pointer">${T.coachHd} <small>${T.coachMeta(S.actions, coachOpen)}</small></div>
+    ${coachOpen ? `${d.plan.length ? `<ol>${steps}<li><b>${T.sEnd}</b></li></ol>` : ""}
+    <div class="sum">${x.sum.join("<br>")}${x.warn?`<div class="warn">${x.warn}</div>`:""}</div>
+    <div class="tip">💡 ${T.tips[(S.turn+S.actions)%T.tips.length]}</div>` : ""}
+    <button class="btn go" id="coachGo">${d.plan.length ? T.coachGo(x.steps[0].label) : T.sEnd}</button>`;
   $("coachHd").onclick = () => { coachOpen = !coachOpen; renderCoach(); };
   $("coachGo").onclick = () => { if(d.plan.length){ const p=d.plan[0]; doAct(p.k,p.a,p.b); } else endTurn(); };
-  // highlight the first recommended step on the board / hand
   if(d.plan.length){
     const p = d.plan[0];
     if(p.k===A.MOVE||p.k===A.ABIL) $("road").querySelector(`.car[data-i="${p.a}"]`)?.classList.add("coachhint");
@@ -470,15 +650,23 @@ function start(m){
   const first = Math.random()<0.5 ? 0 : 1;
   E.new_game((Math.random()*0xffffffff)>>>0 || 1, first);
   S = readState();
-  log(`${who(first)} 먼저 출발!`);
+  log(() => L().firstGo(who(first)));
   render();
   if(mode===0 && S.cur===1) aiTurn();
 }
+function setLang(l){
+  lang = l;
+  try { localStorage.setItem("sandstorm-rally-lang", l); } catch(e){}
+  applyStatic();
+  if(S) render();
+  if($("endM").classList.contains("show")) showEnd();
+}
 
+$("langBtn").onclick=()=>setLang(lang==="en" ? "ko" : "en");
 $("coachBtn").onclick=()=>{ coachOn=!coachOn; $("coachBtn").classList.toggle("on",coachOn); render(); };
 $("rulesBtn").onclick=()=>$("rules").classList.add("show");
-$("typesList").innerHTML = TYPES.map((t,i)=>`<div>${glyph(i)}<span><b>${t.n}</b> — ${t.d}</span></div>`).join("");
 $("rules").onclick = e => { if(e.target.id==="rules") closeM("rules"); };
+applyStatic();
 
 const bytes = Uint8Array.from(atob(WASM_B64), c=>c.charCodeAt(0));
 WebAssembly.instantiate(bytes).then(({instance})=>{ E = instance.exports; start(0); });
