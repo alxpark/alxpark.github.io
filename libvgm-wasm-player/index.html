@@ -136,6 +136,11 @@ ol#pl{list-style:none;margin:10px 0 0;padding:0;max-height:520px;overflow:auto}
 .gd[open]{border-color:#3a414d}
 .gd[open] summary .gs{white-space:normal}
 .gd .spec{margin:0 10px 10px}
+.spec figure{margin:0 0 9px;background:#0b0d10;border:1px solid #23272f;border-radius:8px;overflow:hidden}
+.spec figure img{display:block;width:100%;height:150px;object-fit:contain;background:#0b0d10}
+.spec figcaption{font-size:10.5px;color:var(--dim);padding:4px 8px;font-family:var(--mono);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.spec figcaption a{color:#7fbfa3;text-decoration:none}
+.spec figcaption a:hover{text-decoration:underline}
 #guide{max-height:560px;overflow:auto;margin-top:4px}
 </style>
 </head>
@@ -421,14 +426,14 @@ const CHIPDB = (() => {
   const G = { PSG: "PSG · 구형파", FM: "FM 합성", WAVE: "웨이브테이블", PCM: "PCM 샘플", ADPCM: "ADPCM" };
 
   const db = {
-    0x00: { key: "sn76489", name: "SN76489", aka: "DCSG · SEGA PSG", maker: "Texas Instruments", year: 1979, group: G.PSG,
+    0x00: { key: "sn76489", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/SN76489_01.jpg/330px-SN76489_01.jpg", page: "https://commons.wikimedia.org/wiki/File:SN76489_01.jpg", c: "TI SN76489 · 16핀 DIP" }, name: "SN76489", aka: "DCSG · SEGA PSG", maker: "Texas Instruments", year: 1979, group: G.PSG,
       synth: "구형파 톤 3 + 노이즈 1", voices: "4", demo: "sn76489.vgz",
       systems: "세가 마스터 시스템, 게임 기어, 메가 드라이브(보조 PSG), BBC Micro, ColecoVision",
       feats: ["10비트 분주기로 음정 설정, 채널마다 4비트(2 dB 단위) 감쇠", "노이즈는 주기/화이트 두 모드, 3번 톤 채널 주파수에 연동 가능",
         "세가 판(SEGA PSG)은 LFSR 탭 구성이 달라 노이즈 음색이 다르고, 게임 기어는 채널별 스테레오 지원"],
       links: [WK("Texas_Instruments_SN76489"), LV("sn76496.c"), LV("sn76489.c"), MM("sn76496.cpp")],
       variants: { "T6W28": { aka: "NEOGEO Pocket PSG", systems: "네오지오 포켓 (좌우 독립 감쇠를 가진 SN76489 변형)" } } },
-    0x12: { key: "ay8910", name: "AY-3-8910", aka: "PSG · YM2149(SSG)", maker: "General Instrument", year: 1978, group: G.PSG,
+    0x12: { key: "ay8910", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/YM2149_01.jpg/330px-YM2149_01.jpg", page: "https://commons.wikimedia.org/wiki/File:YM2149_01.jpg", c: "Yamaha YM2149 · AY-3-8910 호환 칩" }, name: "AY-3-8910", aka: "PSG · YM2149(SSG)", maker: "General Instrument", year: 1978, group: G.PSG,
       synth: "구형파 톤 3 + 공용 노이즈 + 하드웨어 엔벌로프", voices: "3", demo: "ay8910.vgz",
       systems: "MSX, ZX Spectrum 128, Amstrad CPC, Atari ST(YM2149), 다수 아케이드",
       feats: ["12비트 톤 주기, 5비트 노이즈 주기", "채널마다 톤/노이즈 믹서 스위치와 4비트 볼륨", "엔벌로프 발생기 1개를 채널이 공유 — 톱니·삼각파 형태로 '버즈 베이스'를 만드는 데 자주 쓰임",
@@ -445,7 +450,7 @@ const CHIPDB = (() => {
       systems: "타이토·아이렘 등 1980년대 아케이드",
       feats: ["오르간처럼 옥타브가 다른 구형파를 섞어 음색을 만듦", "보이스 4개씩 두 그룹, 그룹별 엔벌로프·하모닉 설정"],
       links: [LIST(), LV("msm5232.c"), MM("msm5232.cpp")] },
-    0x14: { key: "nesapu", name: "NES APU", aka: "Ricoh 2A03 / 2A07", maker: "Ricoh", year: 1983, group: G.PSG,
+    0x14: { key: "nesapu", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/RP2A07.jpg/330px-RP2A07.jpg", page: "https://commons.wikimedia.org/wiki/File:RP2A07.jpg", c: "Ricoh RP2A07 (PAL판 2A03)" }, name: "NES APU", aka: "Ricoh 2A03 / 2A07", maker: "Ricoh", year: 1983, group: G.PSG,
       synth: "펄스 2 + 삼각파 1 + 노이즈 1 + DPCM 1", voices: "5", demo: "nes_apu.vgz",
       systems: "패미컴 / NES",
       feats: ["펄스는 듀티비 4종(12.5·25·50·75%)과 하드웨어 피치 스윕", "삼각파는 볼륨 없이 4비트 계단 파형", "DPCM은 1비트 델타 샘플 재생",
@@ -487,7 +492,7 @@ const CHIPDB = (() => {
       systems: "아타리 링스",
       feats: ["채널마다 피드백 탭을 고를 수 있는 12비트 LFSR로 구형파부터 노이즈까지 생성", "8비트 DAC 직접 쓰기로 샘플 재생 가능", "링스판(II)은 채널별 스테레오 패닝"],
       links: [WK("Atari_Lynx"), LV("mikey.c"), MM("lynx.cpp")] },
-    0x1E: { key: "pokey", name: "POKEY", maker: "Atari", year: 1979, group: G.PSG,
+    0x1E: { key: "pokey", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/POKEY_chip_on_an_Atari_130XE_motherboard.jpg/330px-POKEY_chip_on_an_Atari_130XE_motherboard.jpg", page: "https://commons.wikimedia.org/wiki/File:POKEY_chip_on_an_Atari_130XE_motherboard.jpg", c: "아타리 130XE 메인보드의 POKEY" }, name: "POKEY", maker: "Atari", year: 1979, group: G.PSG,
       synth: "분주형 톤/노이즈 4채널", voices: "4", demo: "pokey.vgz",
       systems: "아타리 400/800/XL/XE, 아타리 7800(일부 카트), 아타리 아케이드",
       feats: ["두 채널을 묶어 16비트 분주기로 정밀한 음정", "4·5·17비트 다항 카운터 조합으로 특유의 왜곡 음색", "하이패스 필터 옵션, 키보드·패들 입력과 시리얼 I/O도 담당"],
@@ -499,18 +504,18 @@ const CHIPDB = (() => {
       feats: ["ROM에 내장된 15개 고정 음색 + 사용자 음색 1개", "OPL2를 단순화한 저가형 칩", "코나미 VRC7은 이 칩의 파생형(음색 세트가 다름)"],
       links: [WK("Yamaha_YM2413"), LV("emu2413.c"), LV("nukedopll.c"), MM("ymopl.cpp")],
       variants: { "VRC7": { maker: "Konami", aka: "OPLL 파생", systems: "패미컴 「라그랑주 포인트」 카트리지" } } },
-    0x02: { key: "ym2612", name: "YM2612", aka: "OPN2 · YM3438", maker: "Yamaha", year: 1988, group: G.FM,
+    0x02: { key: "ym2612", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Yamaha_YM2612_top_metal_die_shot.jpg/330px-Yamaha_YM2612_top_metal_die_shot.jpg", page: "https://commons.wikimedia.org/wiki/File:Yamaha_YM2612_top_metal_die_shot.jpg", c: "YM2612 다이(실리콘) 사진" }, name: "YM2612", aka: "OPN2 · YM3438", maker: "Yamaha", year: 1988, group: G.FM,
       synth: "4오퍼레이터 FM 6채널 (6번 채널은 8비트 DAC 전환 가능)", voices: "6", demo: "ym2612.vgz",
       systems: "세가 메가 드라이브 / 제네시스, FM Towns",
       feats: ["알고리즘 8종, 채널별 좌우 패닝과 LFO(비브라토·트레몰로)", "3번 채널 특수 모드로 오퍼레이터별 개별 주파수", "6번 채널 DAC로 드럼·음성 샘플 재생", "9비트 DAC 특유의 '래더 효과' 왜곡 — CMOS판 YM3438에선 줄어듦"],
       links: [WK("Yamaha_YM2612"), LV("ym2612.c"), LV("ym3438.c"), MM("ymopn.cpp")],
       variants: { "YM3438": { aka: "OPN2C (CMOS판)" } } },
-    0x03: { key: "ym2151", name: "YM2151", aka: "OPM", maker: "Yamaha", year: 1983, group: G.FM,
+    0x03: { key: "ym2151", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/YM2151_02.jpg/330px-YM2151_02.jpg", page: "https://commons.wikimedia.org/wiki/File:YM2151_02.jpg", c: "Yamaha YM2151" }, name: "YM2151", aka: "OPM", maker: "Yamaha", year: 1983, group: G.FM,
       synth: "4오퍼레이터 FM 8채널 + 노이즈", voices: "8", demo: "ym2151.vgz",
       systems: "샤프 X68000, 캡콤 CPS-1, 세가 시스템 16 등 다수 아케이드, 야마하 DX21/DX27",
       feats: ["8번 채널 4번 오퍼레이터를 노이즈로 전환", "하드웨어 LFO(PM/AM, 파형 4종)", "음정을 반음보다 세밀한 키 프랙션(1/64 반음)으로 지정", "외부 DAC YM3012로 스테레오 출력"],
       links: [WK("Yamaha_YM2151"), LV("ym2151.c"), LV("nukedopm.c"), MM("ymopm.cpp")] },
-    0x81: { key: "ym2414", name: "YM2414", aka: "OPZ", maker: "Yamaha", group: G.FM,
+    0x81: { key: "ym2414", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/YM2414_02.jpg/330px-YM2414_02.jpg", page: "https://commons.wikimedia.org/wiki/File:YM2414_02.jpg", c: "Yamaha YM2414" }, name: "YM2414", aka: "OPZ", maker: "Yamaha", group: G.FM,
       synth: "4오퍼레이터 FM 8채널", voices: "8",
       systems: "야마하 TX81Z, DX11",
       feats: ["OPM 확장형 — 오퍼레이터마다 파형 8종 선택", "LFO 2개, 고정 주파수 오퍼레이터 지원"],
@@ -520,7 +525,7 @@ const CHIPDB = (() => {
       systems: "NEC PC-8801, PC-9801(PC-9801-26 사운드 보드), 다수 아케이드",
       feats: ["AY-3-8910 호환 SSG를 내장 (칩 패널의 하위 장치로 표시)", "3번 채널 특수 모드", "타이머 2개 내장"],
       links: [WK("Yamaha_YM2203"), WK("Yamaha_OPN", "Wikipedia · OPN 계열"), LV("opnintf.c"), LV("fmopn.c"), MM("ymopn.cpp")] },
-    0x07: { key: "ym2608", name: "YM2608", aka: "OPNA", maker: "Yamaha", year: 1986, group: G.FM,
+    0x07: { key: "ym2608", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/YM2608B_01.jpg/330px-YM2608B_01.jpg", page: "https://commons.wikimedia.org/wiki/File:YM2608B_01.jpg", c: "Yamaha YM2608B" }, name: "YM2608", aka: "OPNA", maker: "Yamaha", year: 1986, group: G.FM,
       synth: "4오퍼레이터 FM 6채널 + SSG 3 + 리듬 6 + ADPCM-B 1", voices: "6 + 3 + 7", demo: "ym2608.vgz",
       systems: "NEC PC-8801 FA/MA, PC-9801-86 사운드 보드",
       feats: ["내장 ROM의 리듬 음원 6종(베이스 드럼, 스네어, 탐, 하이햇, 심벌, 림샷)", "외부 RAM/ROM을 쓰는 델타-T ADPCM(ADPCM-B) 1채널", "FM 채널별 스테레오 패닝과 LFO", "YMF288(OPN3)은 ADPCM을 뺀 후속판"],
@@ -536,7 +541,7 @@ const CHIPDB = (() => {
       systems: "1980년대 아케이드 (버블보블 등), C64용 SFX Sound Expander",
       feats: ["OPL 계열의 첫 칩 — 사인파만 사용", "AM/비브라토 LFO, 키 스케일링", "타이머 2개"],
       links: [WK("Yamaha_OPL", "Wikipedia · OPL 계열"), LV("oplintf.c"), LV("fmopl.c"), MM("ymopl.cpp")] },
-    0x09: { key: "ym3812", name: "YM3812", aka: "OPL2", maker: "Yamaha", year: 1985, group: G.FM,
+    0x09: { key: "ym3812", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Yamaha_YM3812.jpg/330px-Yamaha_YM3812.jpg", page: "https://commons.wikimedia.org/wiki/File:Yamaha_YM3812.jpg", c: "Yamaha YM3812 (OPL2)" }, name: "YM3812", aka: "OPL2", maker: "Yamaha", year: 1985, group: G.FM,
       synth: "2오퍼레이터 FM 9채널 (리듬 모드: 멜로디 6 + 드럼 5)", voices: "9", demo: "ym3812.vgz",
       systems: "애드립, 사운드 블라스터 (DOS 게임 음악의 표준)",
       feats: ["OPL에 파형 4종 추가 (사인, 반파, 절대값 사인, 펄스형 사인)", "DRO(DOSBox Raw OPL) 포맷의 주 대상"],
@@ -546,7 +551,7 @@ const CHIPDB = (() => {
       systems: "MSX-AUDIO (파나소닉 FS-CA1, 필립스 Music Module)",
       feats: ["OPL(YM3526)에 델타-T ADPCM 녹음/재생을 더한 칩", "ADPCM용 외부 샘플 RAM/ROM 사용"],
       links: [WK("Yamaha_Y8950"), LV("oplintf.c"), LV("fmopl.c"), MM("ymopl.cpp")] },
-    0x0C: { key: "ymf262", name: "YMF262", aka: "OPL3", maker: "Yamaha", year: 1990, group: G.FM,
+    0x0C: { key: "ymf262", img: { u: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/YMF262-M.jpg/330px-YMF262-M.jpg", page: "https://commons.wikimedia.org/wiki/File:YMF262-M.jpg", c: "Yamaha YMF262-M (OPL3)" }, name: "YMF262", aka: "OPL3", maker: "Yamaha", year: 1990, group: G.FM,
       synth: "2오퍼레이터 FM 18채널 (또는 4오퍼레이터 6 + 2오퍼레이터 6)", voices: "18", demo: "ymf262.vgz",
       systems: "사운드 블라스터 Pro 2.0 / 16, 애드립 Gold",
       feats: ["파형 8종", "두 채널을 묶는 4오퍼레이터 모드", "4채널 출력(보통 스테레오로 사용)", "OPL2와 하위 호환"],
@@ -1015,9 +1020,12 @@ function fillSpec(box, ci, d) {
     rows.push(["이 곡", `클럭 ${mhz} · 채널 ${d.channels}${d.linkedChannels ? " + " + d.linkedName + " " + d.linkedChannels : ""} · 코어 ${d.core || "?"}`]);
   } else if (ci.voices) rows.push(["채널", ci.voices]);
   rows.push(["사용 기기", ci.systems]);
-  box.innerHTML = `<dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
+  const fig = ci.img ? `<figure><img src="${esc(ci.img.u)}" alt="${esc(ci.img.c)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"><figcaption><span>${esc(ci.img.c)}</span><a href="${esc(ci.img.page)}" target="_blank" rel="noopener noreferrer">사진: Wikimedia Commons · 저작자·라이선스 ↗</a></figcaption></figure>` : "";
+  box.innerHTML = fig + `<dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<ul>${ci.feats.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
     `<div class="lnk">${ci.links.map((l) => `<a href="${esc(l.u)}" target="_blank" rel="noopener noreferrer" title="${esc(l.u)}">${esc(l.t)}</a>`).join("")}</div>`;
+  const im = box.querySelector("figure img");
+  if (im) im.addEventListener("error", () => { im.closest("figure").hidden = true; }, { once: true });
   if (!d && ci.demo && DEMOS.some((x) => x.name === ci.demo)) {
     const act = document.createElement("div"); act.className = "act";
     const b = document.createElement("button"); b.textContent = "▶ 데모 곡 재생";
