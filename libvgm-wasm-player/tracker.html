@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>libvgm.wasm Tracker</title>
+<title>Chip Tracker · libvgm.wasm</title>
 <style>
 /* ---------- themes: one block per game system (body[data-theme]) ---------- */
 :root, body[data-theme="md"] {
@@ -14,6 +14,30 @@
   --hdr-bg: repeating-linear-gradient(180deg, #17171b 0 2px, #0c0c0f 2px 4px);
   --logo: linear-gradient(180deg, #ffffff 0%, #c9ccd6 45%, #6d717f 52%, #e9ebf2 100%);
   --radius: 3px;
+}
+body[data-theme="nes"] {
+  --bg: #161618; --panel: #232326; --panel2: #2d2d31; --line: #38383d; --line2: #4a4a50;
+  --text: #e4e2dc; --dim: #8d8b86; --accent: #d1202f; --accent2: #e8e4da; --accent3: #6aa7ff;
+  --note: #ffffff; --inst: #f0b0b4; --vol: #b9d98a; --fx: #ffb347; --empty: #3d3d42;
+  --rowhl: #1d1d20; --beat: #242428; --bar: #2c2023; --play: #5a1820; --cursor: #d1202f; --sel: #3b3f55;
+  --hdr-bg: repeating-linear-gradient(180deg, #cfccc4 0 3px, #bdbab2 3px 4px); --hdr-text: #1b1b1b; --hdr-dim: #555;
+  --logo: linear-gradient(180deg, #2a2a2a 0%, #111 60%, #000 100%);
+}
+body[data-theme="gb"] {
+  --bg: #0f2a14; --panel: #17351c; --panel2: #1f4224; --line: #2a5a31; --line2: #3b7442;
+  --text: #c9dca0; --dim: #7f9c63; --accent: #9b2a63; --accent2: #b7d15a; --accent3: #a9b4ff;
+  --note: #e3f2b8; --inst: #9bd06a; --vol: #d8e98a; --fx: #f0c75a; --empty: #2f5a34;
+  --rowhl: #133018; --beat: #17381d; --bar: #1d4423; --play: #3e5f1b; --cursor: #b7d15a; --sel: #2d5e4a;
+  --hdr-bg: linear-gradient(180deg, #d4d1c8, #bfbbb1); --hdr-text: #23224f; --hdr-dim: #5b5a6e;
+  --logo: linear-gradient(180deg, #3a3a9a 0%, #23224f 100%);
+}
+body[data-theme="pce"] {
+  --bg: #0c1016; --panel: #141a22; --panel2: #1b232e; --line: #26313f; --line2: #364457;
+  --text: #dfe6ef; --dim: #7c8a9c; --accent: #f28a1c; --accent2: #49b3ff; --accent3: #49b3ff;
+  --note: #ffffff; --inst: #7cc8ff; --vol: #8fe3a8; --fx: #ffb15c; --empty: #2c3746;
+  --rowhl: #121820; --beat: #18202a; --bar: #23201a; --play: #4a2a0c; --cursor: #f28a1c; --sel: #24456a;
+  --hdr-bg: linear-gradient(180deg, #f6f7f9 0%, #dfe3e8 100%); --hdr-text: #18202a; --hdr-dim: #5d6876;
+  --logo: linear-gradient(180deg, #ff9a2e 0%, #e0610b 100%);
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -31,7 +55,9 @@ select { padding: 2px 3px; }
 label { color: var(--dim); white-space: nowrap; }
 
 /* ---------- header ---------- */
-header { background: var(--hdr-bg); border-bottom: 3px solid var(--accent); padding: 6px 10px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+header { background: var(--hdr-bg); color: var(--hdr-text, var(--text)); border-bottom: 3px solid var(--accent); padding: 6px 10px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+header label, header .sub { color: var(--hdr-dim, var(--dim)) !important; }
+header a { color: var(--accent); }
 .logo { font: italic 900 22px/1 "Arial Black", "Helvetica Neue", Arial, sans-serif; letter-spacing: 1px; background: var(--logo);
   -webkit-background-clip: text; background-clip: text; color: transparent; text-transform: uppercase; filter: drop-shadow(0 1px 0 #000); }
 .logo small { font-size: 11px; letter-spacing: 3px; color: var(--accent); -webkit-text-fill-color: var(--accent); font-style: normal; margin-left: 6px; }
@@ -59,7 +85,7 @@ main { flex: 1; display: grid; grid-template-columns: 150px 1fr 330px; min-heigh
 .list .num { color: var(--dim); }
 .list div.sel .num { color: #fff; }
 .badge { font-size: 10px; padding: 0 4px; border-radius: 2px; margin-left: 4px; border: 1px solid currentColor; }
-.t-fm { color: var(--inst); } .t-dac { color: var(--fx); } .t-psg { color: var(--vol); } .t-noise { color: var(--accent2); }
+.t-fm { color: var(--inst); } .t-dac { color: var(--fx); } .t-psg { color: var(--vol); } .t-noise { color: var(--accent2); } .t-wave { color: var(--accent3); }
 
 /* ---------- pattern editor ---------- */
 #patwrap { overflow: auto; position: relative; background: var(--bg); min-width: 0; outline: none; }
@@ -195,7 +221,7 @@ footer { display: grid; grid-template-columns: 220px 1fr; gap: 0; border-top: 1p
   </section>
 
   <section class="panel" id="insts" style="border-right:0;border-left:1px solid var(--line)">
-    <h3>INSTRUMENTS <span class="group"><select id="newType"></select><button id="iAdd" title="악기 추가">＋</button><button id="iDup" title="복제">⧉</button><button id="iDel" title="삭제">✕</button></span></h3>
+    <h3>INSTRUMENTS <span class="group" style="flex-wrap:nowrap"><select id="newType" style="max-width:110px"></select><button id="iAdd" title="악기 추가">＋</button><button id="iDup" title="복제">⧉</button><button id="iDel" title="삭제">✕</button></span></h3>
     <div class="list" id="ilist" style="flex:1"></div>
     <div id="ied"></div>
   </section>
@@ -627,8 +653,144 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
     }
   }
 
-  const CHIPS = { ym2612: YM2612, sn76489: SN76489 };
-  const api = { CHIPS, YM2612, SN76489, OPN_CARRIERS, pitchHz: hz };
+  // ------------------------------------------------------------------ NES 2A03 APU (VGM 0xB4, reg = $4000 + r)
+  class NESAPU {
+    constructor(clock = 1789773) { this.clock = clock; this.key = "nesapu"; this.reset(); }
+    reset() { this.reg = new Int16Array(32).fill(-1); this.ena = 0; this.triOn = false; }
+    w(o, r, d, force = false) { d &= 0xFF; if (!force && this.reg[r] === d) return; this.reg[r] = d; o.push(0xB4, r, d); }
+    init(o) {
+      this.reset();
+      this.w(o, 0x17, 0x40); this.w(o, 0x15, 0x00);
+      this.w(o, 0x00, 0x30); this.w(o, 0x04, 0x30); this.w(o, 0x0C, 0x30); this.w(o, 0x08, 0x80);
+      this.w(o, 0x01, 0x08); this.w(o, 0x05, 0x08);          // sweep off
+      this.w(o, 0x11, 0x40);                                    // DMC level centred
+    }
+    enable(o, bit, on) { const e = on ? this.ena | bit : this.ena & ~bit; if (e !== this.ena) { this.ena = e; this.w(o, 0x15, e, true); } }
+    // pulse ch 0/1: duty 0..3, vol 0..15. trig = (re)load length counter + restart phase
+    pulse(o, ch, pitch, vol, duty, trig) {
+      const b = ch * 4;
+      if (trig) this.enable(o, 1 << ch, true);
+      this.w(o, b, ((duty & 3) << 6) | 0x30 | (vol & 15));
+      const t = Math.max(8, Math.min(0x7FF, Math.round(this.clock / (16 * hz(pitch)) - 1)));
+      this.w(o, b + 2, t & 0xFF);
+      this.w(o, b + 3, 0x08 | (t >> 8), trig);                 // writing $4003 resets the phase: only when needed
+    }
+    pulseOff(o, ch) { this.w(o, ch * 4, 0x30); }
+    tri(o, pitch, on, trig) {
+      if (!on) { if (this.triOn) { this.w(o, 0x08, 0x80); this.enable(o, 4, false); this.triOn = false; } return; }
+      if (!this.triOn || trig) { this.enable(o, 4, true); this.w(o, 0x08, 0xFF, true); }
+      const t = Math.max(2, Math.min(0x7FF, Math.round(this.clock / (32 * hz(pitch)) - 1)));
+      this.w(o, 0x0A, t & 0xFF);
+      this.w(o, 0x0B, 0x08 | (t >> 8), !this.triOn || trig);
+      this.triOn = true;
+    }
+    // noise: period index 0 (high) .. 15 (low); short = 93-step "metallic" mode
+    noise(o, period, short, vol, trig) {
+      if (trig) this.enable(o, 8, true);
+      this.w(o, 0x0C, 0x30 | (vol & 15));
+      this.w(o, 0x0E, (short ? 0x80 : 0) | (period & 15));
+      if (trig) this.w(o, 0x0F, 0x08, true);
+    }
+    noiseOff(o) { this.w(o, 0x0C, 0x30); }
+    // DMC sample: addr = ($C000 + a*64), len = l*16+1 bytes, rate 0..15
+    dmc(o, a, l, rate) {
+      this.enable(o, 0x10, false);
+      this.w(o, 0x10, rate & 15, true); this.w(o, 0x11, 0x40, true);
+      this.w(o, 0x12, a, true); this.w(o, 0x13, l, true);
+      this.enable(o, 0x10, true);
+    }
+    dmcOff(o) { this.enable(o, 0x10, false); }
+  }
+  NESAPU.DMC_RATES = [428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54];
+
+  // ------------------------------------------------------------------ Game Boy DMG APU (VGM 0xB3, reg = $FF10 + r)
+  class GBAPU {
+    constructor(clock = 4194304) { this.clock = clock; this.key = "gameboy"; this.reset(); }
+    reset() { this.reg = new Int16Array(0x30).fill(-1); this.waveKey = null; this.pan = 0xFF; }
+    w(o, r, d, force = false) { d &= 0xFF; if (!force && this.reg[r] === d) return; this.reg[r] = d; o.push(0xB3, r, d); }
+    init(o) {
+      this.reset();
+      this.w(o, 0x16, 0x80); this.w(o, 0x14, 0x77); this.w(o, 0x15, 0xFF);
+      this.w(o, 0x00, 0x08); this.w(o, 0x02, 0x00); this.w(o, 0x07, 0x00); this.w(o, 0x0A, 0x00); this.w(o, 0x11, 0x00);
+    }
+    // pulse ch 0/1. env = { pace 1..7, up } uses the hardware envelope; otherwise volume is set by retriggering
+    pulse(o, ch, pitch, vol, duty, trig, env) {
+      const b = ch ? 0x06 : 0x01;
+      const x = Math.max(0, Math.min(2047, Math.round(2048 - 131072 / hz(pitch))));
+      const nrx2 = ((vol & 15) << 4) | (env && env.pace ? ((env.up ? 8 : 0) | (env.pace & 7)) : 0);
+      this.w(o, b, (duty & 3) << 6);
+      const volChanged = this.reg[b + 1] !== nrx2;
+      if (trig || volChanged) this.w(o, b + 1, nrx2, true);
+      this.w(o, b + 2, x & 0xFF);
+      if (trig || volChanged) this.w(o, b + 3, 0x80 | (x >> 8), true); else this.w(o, b + 3, x >> 8);
+    }
+    pulseOff(o, ch) { this.w(o, ch ? 0x07 : 0x02, 0x00); }
+    wave(o, pitch, vol, table, trig) {
+      const key = table.join(",");
+      if (key !== this.waveKey) {
+        this.w(o, 0x0A, 0x00);
+        for (let i = 0; i < 16; i++) this.w(o, 0x20 + i, ((table[2 * i] & 15) << 4) | (table[2 * i + 1] & 15), true);
+        this.waveKey = key; trig = true;
+      }
+      const code = vol <= 0 ? 0 : vol >= 11 ? 1 : vol >= 6 ? 2 : 3;   // 100% / 50% / 25%
+      const x = Math.max(0, Math.min(2047, Math.round(2048 - 65536 / hz(pitch))));
+      this.w(o, 0x0A, 0x80); this.w(o, 0x0C, code << 5);
+      this.w(o, 0x0D, x & 0xFF);
+      if (trig) this.w(o, 0x0E, 0x80 | (x >> 8), true); else this.w(o, 0x0E, x >> 8);
+    }
+    waveOff(o) { this.w(o, 0x0C, 0x00); }
+    // noise: pitch picks the closest LFSR clock; short = 7-bit (buzzy) LFSR
+    noise(o, pitch, vol, short, trig, env) {
+      const target = hz(pitch) * 32;
+      let best = 0x00, bd = 1e9;
+      for (let s = 0; s < 14; s++) for (let r = 0; r < 8; r++) {
+        const f = 524288 / (r ? r : 0.5) / Math.pow(2, s + 1), d = Math.abs(Math.log(f / target));
+        if (d < bd) { bd = d; best = (s << 4) | r; }
+      }
+      const nr42 = ((vol & 15) << 4) | (env && env.pace ? ((env.up ? 8 : 0) | (env.pace & 7)) : 0);
+      const volChanged = this.reg[0x11] !== nr42;
+      this.w(o, 0x12, best | (short ? 8 : 0));
+      if (trig || volChanged) { this.w(o, 0x11, nr42, true); this.w(o, 0x13, 0x80, true); }
+    }
+    noiseOff(o) { this.w(o, 0x11, 0x00); }
+    setPan(o, ch, l, r) { const m = 0x11 << ch; this.pan = (this.pan & ~m) | (l ? 0x10 << ch : 0) | (r ? 1 << ch : 0); this.w(o, 0x15, this.pan); }
+  }
+
+  // ------------------------------------------------------------------ HuC6280 PSG (VGM 0xB9)
+  class HuC6280 {
+    constructor(clock = 3579545) { this.clock = clock; this.key = "huc6280"; this.reset(); }
+    reset() { this.sel = -1; this.r = Array.from({ length: 6 }, () => new Int16Array(16).fill(-1)); this.waveKey = []; }
+    raw(o, r, d) { o.push(0xB9, r, d & 0xFF); }
+    select(o, ch) { if (this.sel !== ch) { this.sel = ch; this.raw(o, 0x00, ch); } }
+    w(o, ch, r, d, force = false) { d &= 0xFF; if (!force && this.r[ch][r] === d) return; this.select(o, ch); this.r[ch][r] = d; this.raw(o, r, d); }
+    init(o) {
+      this.reset();
+      this.raw(o, 0x01, 0xFF);
+      for (let ch = 0; ch < 6; ch++) { this.w(o, ch, 0x04, 0x00); this.w(o, ch, 0x05, 0xFF); this.w(o, ch, 0x07, 0x00); }
+    }
+    loadWave(o, ch, table) {
+      const key = table.join(",");
+      if (this.waveKey[ch] === key) return false;
+      this.waveKey[ch] = key;
+      this.w(o, ch, 0x04, 0x40, true); this.w(o, ch, 0x04, 0x00, true);   // reset the wave write index
+      for (let i = 0; i < 32; i++) { this.select(o, ch); this.raw(o, 0x06, table[i] & 31); }
+      return true;
+    }
+    tone(o, ch, pitch, vol) {
+      const p = Math.max(1, Math.min(0xFFF, Math.round(this.clock / (32 * hz(pitch)))));
+      this.w(o, ch, 0x07, 0x00);
+      this.w(o, ch, 0x02, p & 0xFF); this.w(o, ch, 0x03, p >> 8);
+      this.volume(o, ch, vol);
+    }
+    // ch 4/5 only: nf 0..31 (31 = highest)
+    noise(o, ch, nf, vol) { this.w(o, ch, 0x07, 0x80 | (nf & 31)); this.volume(o, ch, vol); }
+    volume(o, ch, vol) { const a = vol <= 0 ? 0 : Math.max(1, Math.round(31 - (15 - vol) * 4 / 3)); this.w(o, ch, 0x04, a ? 0x80 | a : 0x00); }
+    off(o, ch) { this.w(o, ch, 0x04, 0x00); }
+    setPan(o, ch, l, r) { this.w(o, ch, 0x05, (l ? 0xF0 : 0) | (r ? 0x0F : 0)); }
+  }
+
+  const CHIPS = { ym2612: YM2612, sn76489: SN76489, nesapu: NESAPU, gameboy: GBAPU, huc6280: HuC6280 };
+  const api = { CHIPS, YM2612, SN76489, NESAPU, GBAPU, HuC6280, OPN_CARRIERS, pitchHz: hz };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Chips = api;
 })(typeof self !== "undefined" ? self : this);
@@ -639,33 +801,38 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
 //   channels          -> what the pattern editor shows; `kinds` = instrument types the channel accepts
 //   runtime()         -> fresh chip drivers + one adapter per channel (engine talks only to adapters)
 //   presets()         -> starter instruments
-// Adding a system (NES, Game Boy, PC Engine ...) = add chip drivers in chips.js and a new entry here.
+// Adding a system = add chip drivers in chips.js and a new entry here (+ a theme block in template.html).
 (function (root) {
   const C = (typeof module !== "undefined" && module.exports) ? require("./chips.js") : root.Chips;
 
   // ---------------------------------------------------------------- DAC drum kit (8-bit unsigned)
   const DAC_RATE = 11025;
   function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) * 2 - 1; }
-  function synth(kind) {
+  function synthF(kind, rate) {   // drum sample as Float32 (-1..1)
     const r = rng(kind.length * 977 + kind.charCodeAt(0));
     const sec = { kick: 0.32, snare: 0.24, chat: 0.06, ohat: 0.3, clap: 0.22, tom: 0.34, crash: 0.9 }[kind];
-    const n = Math.round(sec * DAC_RATE), out = new Float32Array(n);
+    const n = Math.round(sec * rate), out = new Float32Array(n);
     let ph = 0, lp = 0, hp = 0, prev = 0;
     for (let i = 0; i < n; i++) {
-      const t = i / DAC_RATE, nz = r();
+      const t = i / rate, nz = r();
       let v = 0;
-      if (kind === "kick") { const f = 45 + 140 * Math.exp(-t * 28); ph += f / DAC_RATE; v = Math.sin(2 * Math.PI * ph) * Math.exp(-t * 9) + (t < 0.004 ? nz * 0.6 : 0); }
-      else if (kind === "tom") { const f = 85 + 120 * Math.exp(-t * 16); ph += f / DAC_RATE; v = Math.sin(2 * Math.PI * ph) * Math.exp(-t * 8); }
-      else if (kind === "snare") { ph += 185 / DAC_RATE; lp += (nz - lp) * 0.55; v = 0.45 * Math.sin(2 * Math.PI * ph) * Math.exp(-t * 26) + 0.8 * lp * Math.exp(-t * 14); }
+      if (kind === "kick") { const f = 45 + 140 * Math.exp(-t * 28); ph += f / rate; v = Math.sin(2 * Math.PI * ph) * Math.exp(-t * 9) + (t < 0.004 ? nz * 0.6 : 0); }
+      else if (kind === "tom") { const f = 85 + 120 * Math.exp(-t * 16); ph += f / rate; v = Math.sin(2 * Math.PI * ph) * Math.exp(-t * 8); }
+      else if (kind === "snare") { ph += 185 / rate; lp += (nz - lp) * 0.55; v = 0.45 * Math.sin(2 * Math.PI * ph) * Math.exp(-t * 26) + 0.8 * lp * Math.exp(-t * 14); }
       else if (kind === "clap") { const env = [0, 0.011, 0.022].reduce((a, s) => a + (t >= s ? Math.exp(-(t - s) * 180) : 0), 0) + 0.7 * Math.exp(-Math.max(0, t - 0.03) * 18) * (t > 0.03); lp += (nz - lp) * 0.4; v = lp * env * 0.9; }
       else { hp = nz - prev; prev = nz; v = hp * 0.5 * Math.exp(-t * (kind === "chat" ? 70 : kind === "ohat" ? 9 : 4)); }
       out[i] = v;
     }
     let pk = 0; for (const v of out) pk = Math.max(pk, Math.abs(v));
-    const u8 = new Uint8Array(n);
-    for (let i = 0; i < n; i++) u8[i] = Math.max(0, Math.min(255, Math.round(128 + 120 * out[i] / (pk || 1))));
+    for (let i = 0; i < n; i++) out[i] /= (pk || 1);
+    return out;
+  }
+  function synth(kind) {   // 8-bit unsigned at DAC_RATE (Mega Drive DAC)
+    const f = synthF(kind, DAC_RATE), u8 = new Uint8Array(f.length);
+    for (let i = 0; i < f.length; i++) u8[i] = Math.max(0, Math.min(255, Math.round(128 + 120 * f[i])));
     return u8;
   }
+
   const DAC_KIT = ["kick", "snare", "chat", "ohat", "clap", "tom", "crash"];
   const DAC_NAMES = { kick: "Kick", snare: "Snare", chat: "Closed Hat", ohat: "Open Hat", clap: "Clap", tom: "Tom", crash: "Crash" };
   let dacBank = null;
@@ -689,6 +856,8 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
   const megadrive = {
     id: "megadrive",
     name: "Mega Drive / Genesis",
+    logo: "16-BIT Tracker",
+    features: { noiseRate: true, noiseModes: ["화이트 노이즈", "주기 노이즈 (버즈)"] },
     sub: "YM2612 FM ×6 + SN76489 PSG ×4",
     theme: "md",
     tickRates: { NTSC: 60, PAL: 50 },
@@ -703,7 +872,7 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
       { name: "PSG 3", short: "SQ3", chip: "sn76489", kinds: ["psg"] },
       { name: "Noise", short: "NOI", chip: "sn76489", kinds: ["noise"] },
     ],
-    instTypes: { fm: "FM (YM2612)", dac: "DAC 샘플 (FM6)", psg: "PSG 사각파", noise: "PSG 노이즈" },
+    instTypes: { fm: "FM", dac: "DAC (FM6)", psg: "PSG 사각파", noise: "PSG 노이즈" },
     dacKit: DAC_KIT.map((k) => ({ id: k, name: DAC_NAMES[k] })),
     dacRate: DAC_RATE,
 
@@ -815,15 +984,212 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
     },
   };
 
-  // Systems planned next; listed so the UI can show the roadmap (enabled: false).
-  const planned = [
-    { id: "nes", name: "NES / Famicom", sub: "2A03: 펄스 ×2, 삼각파, 노이즈, DPCM", theme: "nes", enabled: false },
-    { id: "gameboy", name: "Game Boy", sub: "DMG APU: 펄스 ×2, 웨이브, 노이즈", theme: "gb", enabled: false },
-    { id: "pce", name: "PC Engine", sub: "HuC6280 웨이브테이블 ×6", theme: "pce", enabled: false },
-  ];
+  // ---------------------------------------------------------------- wavetables (32 steps)
+  function waveTable(kind, max) {
+    const t = [];
+    for (let i = 0; i < 32; i++) {
+      const ph = i / 32; let v;
+      switch (kind) {
+        case "sine": v = Math.sin(2 * Math.PI * ph); break;
+        case "triangle": v = ph < 0.5 ? 4 * ph - 1 : 3 - 4 * ph; break;
+        case "saw": v = 2 * ph - 1; break;
+        case "square": v = ph < 0.5 ? 1 : -1; break;
+        case "pulse25": v = ph < 0.25 ? 1 : -1; break;
+        case "pulse12": v = ph < 0.125 ? 1 : -1; break;
+        case "organ": v = (Math.sin(2 * Math.PI * ph) + 0.5 * Math.sin(4 * Math.PI * ph) + 0.33 * Math.sin(6 * Math.PI * ph)) / 1.5; break;
+        case "bass": v = 0.65 * Math.sin(2 * Math.PI * ph) + 0.35 * (2 * ph - 1); break;
+        case "bell": v = 0.6 * Math.sin(2 * Math.PI * ph) + 0.4 * Math.sin(2 * Math.PI * ph * 5); break;
+        default: v = 0;
+      }
+      t.push(Math.max(0, Math.min(max, Math.round((v * 0.5 + 0.5) * max))));
+    }
+    return t;
+  }
+  const WAVE_SHAPES = { sine: "사인", triangle: "삼각", saw: "톱니", square: "사각", pulse25: "펄스 25%", pulse12: "펄스 12.5%", organ: "오르간", bass: "베이스", bell: "벨" };
+  const pulseI = (name, vol, volLoop, duty, extra = {}) => ({ type: "psg", name, vol, volLoop, arp: [], arpLoop: -1, duty, dutyLoop: extra.dutyLoop ?? -1, ...extra });
+  const noiseI = (name, vol, white = true, extra = {}) => ({ type: "noise", name, vol, volLoop: -1, arp: [], arpLoop: -1, white, ...extra });
+  const waveI = (name, shape, max, vol, volLoop = -1, extra = {}) => ({ type: "wave", name, wave: waveTable(shape, max), vol, volLoop, arp: [], arpLoop: -1, ...extra });
+  const decay = (from, to, step = 1, hold = 1) => { const a = []; for (let v = from; v >= to; v -= step) for (let k = 0; k < hold; k++) a.push(v); return a; };
 
-  const SYSTEMS = { megadrive };
-  const api = { SYSTEMS, PLANNED: planned };
+  // ---------------------------------------------------------------- NES / Famicom
+  const NES_KIT = ["kick", "snare", "chat", "clap", "tom"];
+  const NES_DMC_RATE = 15;                                   // 33.1 kHz at C-4
+  let nesBank = null;
+  function getNesBank() {
+    if (nesBank) return nesBank;
+    const hzRate = 1789773 / C.NESAPU.DMC_RATES[NES_DMC_RATE];
+    const bytes = [], map = {};
+    for (const k of NES_KIT) {
+      while (bytes.length % 64) bytes.push(0x55);
+      const f = synthF(k, hzRate), start = bytes.length;
+      let level = 64, cur = 0, nb = 0;
+      for (let i = 0; i < f.length; i++) {
+        const target = 64 + f[i] * 60, up = target > level;
+        if (up && level <= 125) level += 2; else if (!up && level >= 2) level -= 2;
+        cur |= (up ? 1 : 0) << nb;
+        if (++nb === 8) { bytes.push(cur); cur = 0; nb = 0; }
+      }
+      if (nb) bytes.push(cur);
+      let len = bytes.length - start; const l = Math.min(255, Math.ceil((len - 1) / 16));
+      while (bytes.length < start + l * 16 + 1) bytes.push(0x55);
+      map[k] = { a: start / 64, l };
+    }
+    return (nesBank = { data: Uint8Array.from(bytes), map });
+  }
+  const nes = {
+    id: "nes", name: "NES / Famicom", logo: "8-BIT Tracker",
+    sub: "2A03: 펄스 ×2 · 삼각파 · 노이즈 · DPCM",
+    theme: "nes", tickRates: { NTSC: 60, PAL: 50 },
+    chips: { nesapu: 1789773 }, header: {}, gd3System: "Nintendo Famicom / NES",
+    channels: [
+      { name: "Pulse 1", short: "PU1", chip: "2a03", kinds: ["psg"] },
+      { name: "Pulse 2", short: "PU2", chip: "2a03", kinds: ["psg"] },
+      { name: "Triangle", short: "TRI", chip: "2a03", kinds: ["psg"] },
+      { name: "Noise", short: "NOI", chip: "2a03", kinds: ["noise"] },
+      { name: "DPCM", short: "DMC", chip: "2a03", kinds: ["dac"] },
+    ],
+    instTypes: { psg: "펄스/삼각파", noise: "노이즈", dac: "DPCM" },
+    features: { duty: ["12.5%", "25%", "50%", "75%"], noiseModes: ["노이즈 (긴 주기)", "메탈릭 (짧은 주기)"] },
+    dacKit: NES_KIT.map((k) => ({ id: k, name: DAC_NAMES[k] })),
+    dacHint: "DPCM 채널 전용 1비트 델타 샘플. C-4 = 최고 속도(33 kHz), 한 음 내릴 때마다 한 단계 느린 재생 속도. 삼각파 채널은 듀티·볼륨 없이 켜짐/꺼짐만 있습니다.",
+    prelude(w) { const b = getNesBank(); w.dataBlock(0xC2, Uint8Array.from([0x00, 0xC0, ...b.data])); },
+    runtime() {
+      const apu = new C.NESAPU(this.chips.nesapu), bank = getNesBank();
+      const pulse = (ch) => ({
+        trigger(o, inst, pitch, vol, x) { apu.pulse(o, ch, pitch, vol, x.duty, true); },
+        update(o, inst, pitch, vol, x) { apu.pulse(o, ch, pitch, vol, x.duty, false); },
+        release(o) { apu.pulseOff(o, ch); }, cut(o) { apu.pulseOff(o, ch); }, setPan() {},
+      });
+      const nidx = (pitch) => 15 - (((Math.round(pitch) % 16) + 16) % 16);
+      return {
+        adapters: [pulse(0), pulse(1),
+          { trigger(o, inst, pitch, vol) { apu.tri(o, pitch, vol > 0, true); }, update(o, inst, pitch, vol) { apu.tri(o, pitch, vol > 0, false); },
+            release(o) { apu.tri(o, 0, false); }, cut(o) { apu.tri(o, 0, false); }, setPan() {} },
+          { trigger(o, inst, pitch, vol) { apu.noise(o, nidx(pitch), inst.white === false, vol, true); }, update(o, inst, pitch, vol) { apu.noise(o, nidx(pitch), inst.white === false, vol, false); },
+            release(o) { apu.noiseOff(o); }, cut(o) { apu.noiseOff(o); }, setPan() {} },
+          { trigger(o, inst, pitch, vol) { const s = bank.map[inst.sample] || bank.map.kick; if (vol <= 0) return apu.dmcOff(o); apu.dmc(o, s.a, s.l, Math.max(0, Math.min(15, NES_DMC_RATE + Math.round(pitch) - 60))); },
+            update(o, inst, pitch, vol) { if (vol <= 0) apu.dmcOff(o); }, release(o) { apu.dmcOff(o); }, cut(o) { apu.dmcOff(o); }, setPan() {} },
+        ],
+        init(o) { apu.init(o); },
+      };
+    },
+    presets() {
+      return [
+        pulseI("Pulse Lead 25%", [13, 13, 12, 12, 11], 4, [1]),
+        pulseI("Pulse Pluck 50%", decay(14, 0, 1), -1, [2]),
+        pulseI("Pulse Arp 12.5%", [10, 10, 9, 9, 8], 4, [0]),
+        pulseI("Pulse Duty Sweep", [12, 12, 11, 11, 10], 4, [0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1], { dutyLoop: 0 }),
+        pulseI("Pulse Echo", decay(8, 0, 1, 2), -1, [1]),
+        pulseI("Triangle", [15], -1, [2]),
+        pulseI("Triangle Kick", [15, 15, 15, 15, 15, 0], -1, [2], { arp: [24, 12, 5, 0, -7, -12] }),
+        noiseI("Noise Hat", [10, 6, 3, 1, 0]),
+        noiseI("Noise Snare", decay(15, 0, 1)),
+        noiseI("Noise Metal", [12, 9, 6, 3, 0], false),
+        ...NES_KIT.map((k) => ({ type: "dac", name: "DPCM " + DAC_NAMES[k], sample: k })),
+      ];
+    },
+  };
+
+  // ---------------------------------------------------------------- Game Boy
+  const gameboy = {
+    id: "gameboy", name: "Game Boy", logo: "8-BIT Tracker",
+    sub: "DMG APU: 펄스 ×2 · 웨이브 · 노이즈",
+    theme: "gb", tickRates: { "59.7 Hz": 60, "64 Hz": 64 },
+    chips: { gameboy: 4194304 }, header: {}, gd3System: "Nintendo Game Boy",
+    channels: [
+      { name: "Pulse 1", short: "PU1", chip: "dmg", kinds: ["psg"] },
+      { name: "Pulse 2", short: "PU2", chip: "dmg", kinds: ["psg"] },
+      { name: "Wave", short: "WAV", chip: "dmg", kinds: ["wave"] },
+      { name: "Noise", short: "NOI", chip: "dmg", kinds: ["noise"] },
+    ],
+    instTypes: { psg: "펄스", wave: "웨이브", noise: "노이즈" },
+    features: { duty: ["12.5%", "25%", "50%", "75%"], waveMax: 15, hwEnv: true, noiseModes: ["노이즈 (15비트)", "버즈 (7비트)"] },
+    waveShapes: WAVE_SHAPES,
+    runtime() {
+      const gb = new C.GBAPU(this.chips.gameboy);
+      const pulse = (ch) => ({
+        tv: 0,
+        trigger(o, inst, pitch, vol, x) { this.tv = vol; gb.pulse(o, ch, pitch, vol, x.duty, vol > 0, inst.env); },
+        update(o, inst, pitch, vol, x) {
+          if (inst.env && inst.env.pace) { if (vol === 0) gb.pulseOff(o, ch); else gb.pulse(o, ch, pitch, this.tv, x.duty, false, inst.env); }
+          else if (vol === 0) gb.pulseOff(o, ch); else gb.pulse(o, ch, pitch, vol, x.duty, false, null);
+        },
+        release(o) { gb.pulseOff(o, ch); }, cut(o) { gb.pulseOff(o, ch); }, setPan(o, l, r) { gb.setPan(o, ch, l, r); },
+      });
+      return {
+        adapters: [pulse(0), pulse(1),
+          { trigger(o, inst, pitch, vol) { gb.wave(o, pitch, vol, inst.wave, true); }, update(o, inst, pitch, vol) { gb.wave(o, pitch, vol, inst.wave, false); },
+            release(o) { gb.waveOff(o); }, cut(o) { gb.waveOff(o); }, setPan(o, l, r) { gb.setPan(o, 2, l, r); } },
+          { tv: 0,
+            trigger(o, inst, pitch, vol) { this.tv = vol; gb.noise(o, pitch, vol, inst.white === false, vol > 0, inst.env); },
+            update(o, inst, pitch, vol) { if (vol === 0) gb.noiseOff(o); else gb.noise(o, pitch, inst.env && inst.env.pace ? this.tv : vol, inst.white === false, false, inst.env); },
+            release(o) { gb.noiseOff(o); }, cut(o) { gb.noiseOff(o); }, setPan(o, l, r) { gb.setPan(o, 3, l, r); } },
+        ],
+        init(o) { gb.init(o); },
+      };
+    },
+    presets() {
+      return [
+        pulseI("Pulse Lead", [13], -1, [2]),
+        pulseI("Pulse Pluck (HW env)", [15], -1, [1], { env: { pace: 2, up: false } }),
+        pulseI("Pulse Arp", [10], -1, [0]),
+        pulseI("Pulse Soft (HW env)", [12], -1, [2], { env: { pace: 5, up: false } }),
+        pulseI("Pulse Echo", [6], -1, [1], { env: { pace: 3, up: false } }),
+        waveI("Wave Bass", "bass", 15, [15]),
+        waveI("Wave Saw Lead", "saw", 15, [15]),
+        waveI("Wave Sine", "sine", 15, [15]),
+        waveI("Wave Square", "square", 15, [10]),
+        noiseI("Noise Kick", [15], true, { env: { pace: 1, up: false } }),
+        noiseI("Noise Snare", [13], true, { env: { pace: 2, up: false } }),
+        noiseI("Noise Hat", [9], true, { env: { pace: 1, up: false } }),
+        noiseI("Noise Buzz", [11], false, { env: { pace: 3, up: false } }),
+      ];
+    },
+  };
+
+  // ---------------------------------------------------------------- PC Engine / TurboGrafx-16
+  const pce = {
+    id: "pce", name: "PC Engine / TurboGrafx-16", logo: "16-BIT Tracker",
+    sub: "HuC6280: 웨이브테이블 ×6 (5·6번은 노이즈 겸용)",
+    theme: "pce", tickRates: { NTSC: 60 },
+    chips: { huc6280: 3579545 }, header: {}, gd3System: "NEC PC Engine / TurboGrafx-16",
+    channels: [1, 2, 3, 4, 5, 6].map((n) => ({ name: "Wave " + n, short: "CH" + n, chip: "huc6280", kinds: n >= 5 ? ["wave", "noise"] : ["wave"] })),
+    instTypes: { wave: "웨이브", noise: "노이즈 (5·6번)" },
+    features: { waveMax: 31 },
+    waveShapes: WAVE_SHAPES,
+    runtime() {
+      const h = new C.HuC6280(this.chips.huc6280);
+      const nf = (pitch) => Math.max(0, Math.min(31, Math.round(pitch) - 40));
+      const ad = (ch) => ({
+        trigger(o, inst, pitch, vol) {
+          if (inst.type === "noise") return h.noise(o, ch, nf(pitch), vol);
+          h.loadWave(o, ch, inst.wave); h.tone(o, ch, pitch, vol);
+        },
+        update(o, inst, pitch, vol) { if (inst.type === "noise") h.noise(o, ch, nf(pitch), vol); else h.tone(o, ch, pitch, vol); },
+        release(o) { h.off(o, ch); }, cut(o) { h.off(o, ch); }, setPan(o, l, r) { h.setPan(o, ch, l, r); },
+      });
+      return { adapters: [0, 1, 2, 3, 4, 5].map(ad), init(o) { h.init(o); } };
+    },
+    presets() {
+      return [
+        waveI("Pulse Lead", "pulse25", 31, [15, 15, 14, 14, 13], 4),
+        waveI("Saw Lead", "saw", 31, [14, 14, 13], 2),
+        waveI("Bass", "bass", 31, [15, 14, 13, 13, 12], 4),
+        waveI("Organ", "organ", 31, [12], -1),
+        waveI("Sine Pluck", "sine", 31, decay(15, 0, 1, 2)),
+        waveI("Triangle Echo", "triangle", 31, decay(10, 0, 1, 2)),
+        waveI("Bell", "bell", 31, decay(13, 0, 1, 3)),
+        noiseI("Noise Hat", [12, 7, 3, 0]),
+        noiseI("Noise Snare", decay(15, 0, 1)),
+        noiseI("Noise Kick", [15, 12, 8, 4, 0], true, { arp: [0, -6, -12, -18], arpLoop: -1 }),
+      ];
+    },
+  };
+
+  const planned = [];
+
+  const SYSTEMS = { megadrive, nes, gameboy, pce };
+  const api = { SYSTEMS, PLANNED: planned, waveTable };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Systems = api;
 })(typeof self !== "undefined" ? self : this);
@@ -1022,12 +1388,14 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
       let mv = 15;
       if (inst.vol && inst.vol.length) mv = inst.vol[macroIdx(inst.vol.length, inst.volLoop, c.macroPos)];
       if (inst.arp && inst.arp.length) pitch += inst.arp[macroIdx(inst.arp.length, inst.arpLoop, c.macroPos)];
+      const duty = inst.duty && inst.duty.length ? inst.duty[macroIdx(inst.duty.length, inst.dutyLoop ?? -1, c.macroPos)] : 2;
       c.macroPos++;
       let vol = Math.round(c.vol * mv / 15);
       if (this.mute[ch]) vol = 0;
-      if (c.triggered) { c.triggered = false; ad.trigger(o, inst, pitch, vol); }
-      else if (pitch !== c.lastPitch || vol !== c.lastVol) ad.update(o, inst, pitch, vol);
-      c.lastPitch = pitch; c.lastVol = vol;
+      const x = { duty, chVol: this.mute[ch] ? 0 : c.vol };
+      if (c.triggered) { c.triggered = false; ad.trigger(o, inst, pitch, vol, x); }
+      else if (pitch !== c.lastPitch || vol !== c.lastVol || duty !== c.lastDuty) ad.update(o, inst, pitch, vol, x);
+      c.lastPitch = pitch; c.lastVol = vol; c.lastDuty = duty;
       c.level = Math.max(c.level * 0.8, vol / 15);
     }
   }
@@ -1037,7 +1405,7 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
   function baseVgm(song) {
     const sys = Sys.SYSTEMS[song.system];
     const w = new W.VgmWriter();
-    sys.prelude(w);
+    if (sys.prelude) sys.prelude(w);
     w.markLoop(); w.wait(44100 * 60); w.end();
     return W.buildVgm(w, { clocks: sys.chips, header: sys.header, rate: song.tickHz });
   }
@@ -1049,7 +1417,7 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
     const seq = new Sequencer(song);
     if (opts.mute) opts.mute.forEach((m, i) => (seq.mute[i] = !!m));
     const w = new W.VgmWriter();
-    sys.prelude(w);
+    if (sys.prelude) sys.prelude(w);
     const o = [];
     seq.init(o); w.bytes(o); o.length = 0;
     seq.start(opts.startOrder || 0, 0, false);
@@ -1091,7 +1459,7 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
         PLUCK = 11, PLEAD = 12, ECHO = 13, NHAT = 15, NSNR = 16;
   const FM1 = 0, FM2 = 1, FM3 = 2, FM4 = 3, FM5 = 4, DAC = 5, SQ1 = 6, SQ2 = 7, SQ3 = 8, NOI = 9;
 
-  function demoSong() {
+  function megadriveSong() {
     const song = E.newSong("megadrive");
     song.title = "Sunset Circuit"; song.author = "libvgm.wasm tracker"; song.speed = 6; song.rows = 64;
     const P = () => E.newPattern(64, 10);
@@ -1152,6 +1520,68 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
     song.orders = [0, 1, 2, 3, 2];
     return song;
   }
+
+
+  // ---- generic arranger: same tune, mapped onto any system's channels via a role spec
+  const CH = { Am: ["A3", "C4", "E4", "A2", 0x37], F: ["A3", "C4", "F4", "F2", 0x47], C: ["G3", "C4", "E4", "C3", 0x47], G: ["G3", "B3", "D4", "G2", 0x47], Em: ["G3", "B3", "E4", "E2", 0x37] };
+  const MEL_A = [[0, "A4", 4], [4, "C5", 2], [6, "E5", 4], [10, "D5", 2], [12, "C5", 2], [14, "B4", 2], [16, "A4", 6, 1], [22, "F4", 2], [24, "A4", 2], [26, "C5", 2], [28, "F5", 4],
+                 [32, "E5", 4], [36, "G5", 2], [38, "E5", 2], [40, "D5", 4], [44, "C5", 2], [46, "E5", 2], [48, "D5", 8, 1], [56, "B4", 2], [58, "C5", 2], [60, "D5", 4]];
+  const MEL_B = [[0, "C5", 4], [4, "F5", 4], [8, "E5", 2], [10, "F5", 2], [12, "A5", 4], [16, "G5", 6, 1], [22, "F5", 2], [24, "E5", 2], [26, "D5", 2], [28, "B4", 4],
+                 [32, "E5", 4], [36, "G5", 4], [40, "B5", 4], [44, "A5", 2], [46, "G5", 2], [48, "A5", 12, 1], [60, "E5", 4]];
+  const SPECS = {
+    nes: { title: "Sunset Circuit (2A03)", lead: ["Pulse Lead 25%", 0, 12], arp: ["Pulse Arp 12.5%", 1, 9], bass: ["Triangle", 2, 15, 12],
+           kick: ["DPCM Kick", 4, 15, "C4"], snare: ["DPCM Snare", 4, 15, "C4"], hat: ["Noise Hat", 3, 9, "D4"], snareLayer: ["Noise Snare", 3, 10, "A#3"],
+           double: ["Pulse Echo", 1, 12, 0] },
+    gameboy: { title: "Sunset Circuit (DMG)", lead: ["Pulse Lead", 0, 13], arp: ["Pulse Arp", 1, 11], bass: ["Wave Bass", 2, 15, 12],
+               kick: ["Noise Kick", 3, 15, "C2"], snare: ["Noise Snare", 3, 15, "C5"], hat: ["Noise Hat", 3, 10, "C7"], double: ["Pulse Echo", 1, 15, 0] },
+    pce: { title: "Sunset Circuit (HuC6280)", lead: ["Pulse Lead", 0, 12], echo: ["Triangle Echo", 1, 13], bass: ["Bass", 2, 14, 12], arp: ["Organ", 3, 10],
+           hat: ["Noise Hat", 4, 10, "C6"], kick: ["Noise Kick", 5, 15, "E3"], snare: ["Noise Snare", 5, 14, "E4"], double: ["Bell", 1, 11, 12] },
+  };
+  function arrangedSong(sysId) {
+    const spec = SPECS[sysId], song = E.newSong(sysId), nch = song.patterns[0][0].length;
+    song.title = spec.title; song.author = "libvgm.wasm tracker"; song.speed = 6; song.rows = 64;
+    const I = (name) => { const k = song.instruments.findIndex((x) => x.name === name); if (k < 0) throw new Error("no preset " + name); return k; };
+    const P = () => E.newPattern(64, nch);
+    const put = (p, r, ch, c) => Object.assign(p[r][ch], c);
+    const note = (p, r, ch, n, i, v, len) => {
+      put(p, r, ch, { n: typeof n === "string" ? N(n) : n, i, v });
+      if (len && r + len < 64 && p[r + len][ch].n == null) put(p, r + len, ch, { n: E.NOTE_OFF });
+    };
+    const role = (k) => spec[k] && { i: I(spec[k][0]), ch: spec[k][1], v: spec[k][2], x: spec[k][3] };
+    const R = Object.fromEntries(["lead", "echo", "arp", "bass", "kick", "snare", "hat", "snareLayer", "double"].map((k) => [k, role(k)]));
+    function backing(p, prog, { fills = false } = {}) {
+      prog.forEach((name, bar) => {
+        const [a, , , root, arp] = CH[name], r0 = bar * 16;
+        [[0, 0], [3, 0], [6, 12], [8, 0], [11, 0], [12, 12], [14, 7]].forEach(([r, d]) => note(p, r0 + r, R.bass.ch, N(root) + d + (R.bass.x || 0), R.bass.i, R.bass.v, 2));
+        if (R.arp) for (let q = 0; q < 4; q++) { note(p, r0 + q * 4, R.arp.ch, N(a) + 12, R.arp.i, R.arp.v, 3); put(p, r0 + q * 4, R.arp.ch, { fx: 0x0, fp: arp }); }
+        const drum = (r, d) => d && note(p, r0 + r, d.ch, d.x, d.i, d.v);
+        for (let r = 0; r < 16; r += 2) if (![0, 4, 8, 12].includes(r) || R.hat.ch !== R.kick.ch) drum(r, { ...R.hat, v: r % 4 ? R.hat.v - 3 : R.hat.v });
+        for (const r of [0, 8, 10]) drum(r, R.kick);
+        for (const r of [4, 12]) { drum(r, R.snare); if (R.snareLayer && R.snareLayer.ch !== R.hat.ch) drum(r, R.snareLayer); else if (R.snareLayer) drum(r, R.snareLayer); }
+        if (fills && bar === 3) drum(15, R.snare);
+      });
+    }
+    function melody(p, mel, echo) {
+      for (const [r, n, len, vib] of mel) {
+        note(p, r, R.lead.ch, n, R.lead.i, R.lead.v, len);
+        if (vib && r + 2 < 64) put(p, r + 2, R.lead.ch, { fx: 4, fp: 0x44 });
+        if (echo && R.echo && r + 3 < 64) note(p, r + 3, R.echo.ch, N(n), R.echo.i, R.echo.v, 0);
+      }
+    }
+    const intro = P(); backing(intro, ["Am", "F", "C", "G"]);
+    note(intro, 56, R.lead.ch, "A4", R.lead.i, R.lead.v - 2, 8); put(intro, 57, R.lead.ch, { fx: 0x1, fp: 0x0C });
+    const A = P(); backing(A, ["Am", "F", "C", "G"]); melody(A, MEL_A, true);
+    const B = P(); backing(B, ["F", "G", "Em", "Am"], { fills: true }); melody(B, MEL_B, true); put(B, 58, R.lead.ch, { fx: 0x2, fp: 0x06 });
+    const A2 = P(); backing(A2, ["Am", "F", "C", "G"], { fills: true });
+    // A2: the arp/echo channel switches to an octave-up double of the melody
+    for (let r = 0; r < 64; r++) A2[r][R.double.ch] = E.emptyCell();
+    melody(A2, MEL_A, false);
+    MEL_A.forEach(([r, n, len]) => note(A2, r, R.double.ch, N(n) + R.double.x, R.double.i, R.double.v, len));
+    song.patterns = [intro, A, B, A2];
+    song.orders = [0, 1, 2, 3, 2];
+    return song;
+  }
+  const demoSong = (sysId = "megadrive") => (sysId === "megadrive" ? megadriveSong() : arrangedSong(sysId));
 
   if (typeof module !== "undefined" && module.exports) module.exports = { demoSong };
   else root.Demo = { demoSong };
@@ -1378,7 +1808,9 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
   function renderSystem() {
     const sel = $("system");
     sel.innerHTML = Object.values(Systems.SYSTEMS).map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")
-      + Systems.PLANNED.map((s) => `<option disabled>${esc(s.name)} — 준비 중</option>`).join("");
+      + (Systems.PLANNED || []).map((s) => `<option disabled>${esc(s.name)} — 준비 중</option>`).join("");
+    document.querySelector(".logo").firstChild.textContent = S.sys.logo || "Chip Tracker";
+    document.title = (S.sys.logo || "Chip Tracker") + " · " + S.sys.name;
     sel.value = S.sys.id;
     $("syssub").textContent = S.sys.sub;
     $("title").value = S.song.title; $("author").value = S.song.author;
@@ -1462,7 +1894,7 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
   }
 
   // ------------------------------------------------------------------ instruments
-  const typeLabel = { fm: "FM", dac: "DAC", psg: "PSG", noise: "NOI" };
+  const typeLabel = { fm: "FM", dac: "DAC", psg: "PSG", noise: "NOI", wave: "WAV" };
   function renderInstList() {
     $("ilist").innerHTML = S.song.instruments.map((x, i) => `<div data-i="${i}" class="${i === S.inst ? "sel" : ""}"><span class="num">${hex(i, 2)}</span> ${esc(x.name)}<span class="badge t-${x.type}">${typeLabel[x.type] || x.type}</span></div>`).join("");
   }
@@ -1485,17 +1917,36 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
         + `</table><div class="hint" style="margin-top:6px">◆ = 캐리어. TL은 클수록 작아짐. 패치 변경은 다음 노트부터 적용. LFO 감도(AMS/FMS)는 LFO가 켜져 있을 때 동작.</div>`;
     } else if (ins.type === "dac") {
       h += `<div class="r"><label>샘플</label><select id="dacs">${S.sys.dacKit.map((d) => `<option value="${d.id}"${d.id === ins.sample ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
-            <div class="hint">FM 6 채널 전용. C-4 = 원래 속도(${S.sys.dacRate} Hz), 음 높이에 따라 재생 속도가 바뀝니다. DAC 노트가 나오면 FM 6은 DAC 모드로, FM 악기가 나오면 다시 FM으로 돌아갑니다.</div>`;
+            <div class="hint">${esc(S.sys.dacHint || `FM 6 채널 전용. C-4 = 원래 속도(${S.sys.dacRate} Hz), 음 높이에 따라 재생 속도가 바뀝니다. DAC 노트가 나오면 FM 6은 DAC 모드로, FM 악기가 나오면 다시 FM으로 돌아갑니다.`)}</div>`;
     } else {
+      const F = S.sys.features || {};
+      if (ins.type === "wave") {
+        const max = F.waveMax || 15;
+        h += `<div class="r"><label>파형</label><span class="hint">32칸 × ${max + 1}단계, 드래그로 그리기</span>
+              <select id="wshape"><option value="">모양 불러오기…</option>${Object.entries(S.sys.waveShapes || {}).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("")}</select></div>
+              <canvas class="macro" id="wcv" width="600" height="180"></canvas>`;
+      }
+      if (ins.type === "psg" && F.duty)
+        h += `<div class="r" style="margin-top:6px"><label>듀티</label><input type="text" id="mduty" value="${(ins.duty || [2]).join(" ")}" style="width:120px" title="듀티 매크로: 틱마다 한 칸"><label>루프</label><input type="number" id="mdutyl" min="-1" max="63" value="${ins.dutyLoop ?? -1}"><span class="hint">${F.duty.map((d, i) => i + "=" + d).join(" ")}</span></div>`;
+      if (F.hwEnv && ins.type !== "wave") {
+        const env = ins.env || { pace: 0, up: false };
+        h += `<div class="r"><label>HW 엔벨로프</label><input type="number" id="epace" min="0" max="7" value="${env.pace}" title="0 = 끔(볼륨 매크로 사용), 1(빠름)–7(느림)">
+              <select id="eup"><option value="0"${env.up ? "" : " selected"}>감소</option><option value="1"${env.up ? " selected" : ""}>증가</option></select>
+              <span class="hint">켜면 볼륨 매크로 첫 값에서 하드웨어가 페이드</span></div>`;
+      }
       h += `<div class="r"><label>볼륨</label><span class="hint">매크로 (틱마다 한 칸, 드래그로 그리기)</span></div>
             <canvas class="macro" id="mcv" width="600" height="180"></canvas>
             <div class="r" style="margin-top:6px"><label>길이</label><input type="number" id="mlen" min="1" max="64" value="${ins.vol.length}">
             <label>루프</label><input type="number" id="mloop" min="-1" max="63" value="${ins.volLoop}" title="-1 = 루프 없음(마지막 값 유지)"></div>
             <div class="r"><label>아르페지오</label><input type="text" id="marp" value="${(ins.arp || []).join(" ")}" placeholder="예: 0 4 7" style="width:120px" title="반음 단위, 틱마다 한 칸"><label>루프</label><input type="number" id="marpl" min="-1" max="63" value="${ins.arpLoop ?? -1}"></div>`;
-      if (ins.type === "noise")
-        h += `<div class="r"><label>모드</label><select id="nwhite"><option value="1"${ins.white !== false ? " selected" : ""}>화이트 노이즈</option><option value="0"${ins.white === false ? " selected" : ""}>주기 노이즈 (버즈)</option></select>
-              <label>주파수</label><select id="nrate">${["높음 (N/512)", "중간 (N/1024)", "낮음 (N/2048)", "PSG 3 음정 따라감"].map((t, i) => `<option value="${i}"${(ins.rate ?? 0) === i ? " selected" : ""}>${t}</option>`).join("")}</select></div>
+      if (ins.type === "noise") {
+        const modes = F.noiseModes;
+        if (modes) h += `<div class="r"><label>모드</label><select id="nwhite"><option value="1"${ins.white !== false ? " selected" : ""}>${esc(modes[0])}</option><option value="0"${ins.white === false ? " selected" : ""}>${esc(modes[1])}</option></select></div>`;
+        if (F.noiseRate)
+          h += `<div class="r"><label>주파수</label><select id="nrate">${["높음 (N/512)", "중간 (N/1024)", "낮음 (N/2048)", "PSG 3 음정 따라감"].map((t, i) => `<option value="${i}"${(ins.rate ?? 0) === i ? " selected" : ""}>${t}</option>`).join("")}</select></div>
               <div class="hint">"PSG 3 음정 따라감"이면 노트 음정대로 소리 나며 PSG 3 채널을 빌려 씁니다.</div>`;
+        else h += `<div class="hint">노트 높이가 노이즈 주파수를 고릅니다 (높은 노트 = 높은 소리).</div>`;
+      }
     }
     el.innerHTML = h;
     bindInstEditor(ins);
@@ -1551,9 +2002,40 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
       $("mloop").oninput = (e) => { ins.volLoop = clamp(+e.target.value | 0, -1, ins.vol.length - 1); draw(); dirty(); };
       $("marp").oninput = (e) => { ins.arp = e.target.value.trim().split(/[\s,]+/).filter(Boolean).map((x) => clamp(parseInt(x, 10) || 0, -48, 48)); dirty(); };
       $("marpl").oninput = (e) => { ins.arpLoop = clamp(+e.target.value | 0, -1, 63); dirty(); };
-      if (ins.type === "noise") {
-        $("nwhite").onchange = (e) => { ins.white = e.target.value === "1"; dirty(); previewInst(); };
-        $("nrate").onchange = (e) => { ins.rate = +e.target.value; dirty(); previewInst(); };
+      if ($("nwhite")) $("nwhite").onchange = (e) => { ins.white = e.target.value === "1"; dirty(); previewInst(); };
+      if ($("nrate")) $("nrate").onchange = (e) => { ins.rate = +e.target.value; dirty(); previewInst(); };
+      if ($("mduty")) {
+        $("mduty").oninput = (e) => { ins.duty = e.target.value.trim().split(/[\s,]+/).filter(Boolean).map((x) => clamp(parseInt(x, 10) || 0, 0, 3)); if (!ins.duty.length) ins.duty = [2]; dirty(); };
+        $("mdutyl").oninput = (e) => { ins.dutyLoop = clamp(+e.target.value | 0, -1, 63); dirty(); };
+      }
+      if ($("epace")) {
+        const setEnv = () => { ins.env = { pace: clamp(+$("epace").value | 0, 0, 7), up: $("eup").value === "1" }; dirty(); };
+        $("epace").oninput = setEnv; $("eup").onchange = () => { setEnv(); previewInst(); };
+      }
+      if ($("wcv")) {
+        const wc = $("wcv"), wg = wc.getContext("2d"), max = (S.sys.features || {}).waveMax || 15;
+        const wdraw = () => {
+          const W = wc.width, H = wc.height, cs = getComputedStyle(document.body), bw = W / 32;
+          wg.fillStyle = cs.getPropertyValue("--bg"); wg.fillRect(0, 0, W, H);
+          wg.strokeStyle = cs.getPropertyValue("--line"); wg.beginPath(); wg.moveTo(0, H / 2); wg.lineTo(W, H / 2); wg.stroke();
+          wg.fillStyle = cs.getPropertyValue("--inst");
+          ins.wave.forEach((v, i) => { const y = H - (v / max) * (H - 4) - 2; wg.fillRect(i * bw + 1, y, bw - 2, 5); wg.globalAlpha = 0.25; wg.fillRect(i * bw + 1, y, bw - 2, H - y); wg.globalAlpha = 1; });
+        };
+        let wd = false;
+        const wset = (e) => {
+          const r = wc.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / r.width * 32);
+          if (i < 0 || i > 31) return;
+          ins.wave[i] = clamp(Math.round((1 - (e.clientY - r.top) / r.height) * max), 0, max); wdraw(); dirty();
+        };
+        wc.onpointerdown = (e) => { wd = true; wc.setPointerCapture(e.pointerId); wset(e); };
+        wc.onpointermove = (e) => wd && wset(e);
+        wc.onpointerup = () => { wd = false; };
+        $("wshape").onchange = (e) => {
+          if (!e.target.value) return;
+          const p = S.sys.presets().find((x) => x.type === "wave");
+          ins.wave = Systems.waveTable(e.target.value, max); wdraw(); dirty(); previewInst();
+        };
+        wdraw();
       }
       draw();
     }
@@ -1757,11 +2239,17 @@ async function loadVgmWorklet(ctx, src, timeoutMs = 4000) {
 
   // ------------------------------------------------------------------ bindings
   function bindUi() {
-    $("system").onchange = (e) => { /* only one system enabled for now */ e.target.value = S.sys.id; };
+    $("system").onchange = (e) => {
+      const id = e.target.value, sys = Systems.SYSTEMS[id];
+      e.target.value = S.sys.id;
+      if (!sys || id === S.sys.id) return;
+      const demo = confirm(`${sys.name}(으)로 바꿉니다. 현재 곡은 이 기종의 칩으로 옮길 수 없어서 새 곡이 됩니다.\n\n확인: ${sys.name} 데모 곡 불러오기\n취소: 빈 곡으로 시작`);
+      stop(); setSong(demo ? Demo.demoSong(id) : Engine.newSong(id)); dirty();
+    };
     $("title").oninput = (e) => { S.song.title = e.target.value; dirty(); };
     $("author").oninput = (e) => { S.song.author = e.target.value; dirty(); };
     $("bNew").onclick = () => { if (confirm("새 곡을 만들까요? (현재 곡은 자동 저장본이 덮어써집니다)")) { stop(); setSong(Engine.newSong(S.sys.id)); dirty(); } };
-    $("bDemo").onclick = () => { if (confirm("데모 곡을 불러올까요? 현재 곡은 사라집니다.")) { stop(); setSong(Demo.demoSong()); dirty(); } };
+    $("bDemo").onclick = () => { if (confirm("데모 곡을 불러올까요? 현재 곡은 사라집니다.")) { stop(); setSong(Demo.demoSong(S.sys.id)); dirty(); } };
     $("bOpen").onclick = () => $("file").click();
     $("file").onchange = async (e) => {
       const f = e.target.files[0]; if (!f) return;

@@ -530,17 +530,17 @@ footer a { color: inherit; }
     </li>
     <li>
       <a class="app" href="./libvgm-wasm-player/tracker.html">
-        <img class="cover smooth" src="./libvgm-wasm-player/tracker-cover.png" width="288" height="512" alt="16-BIT Tracker on a phone: a red-and-black pattern editor with FM 1 to FM 3 columns of notes, a yellow oscilloscope and an on-screen piano">
+        <img class="cover smooth" src="./libvgm-wasm-player/tracker-cover.png" width="288" height="512" alt="Chip Tracker (Mega Drive theme) on a phone: a red-and-black pattern editor with FM 1 to FM 3 columns of notes, a yellow oscilloscope and an on-screen piano">
         <div class="body">
-          <h2 class="name">16-BIT Tracker</h2>
-          <p class="desc">A music tracker built on the same libvgm.wasm engine, with one chip setup per game system. It starts with the Mega Drive: six YM2612 FM channels (FM 6 doubles as a DAC drum channel) plus the SN76489's three squares and noise. Write patterns with the keyboard, the on-screen piano or a MIDI keyboard, record live into the pattern while it plays, edit FM operators and PSG macros, then export VGM, WAV or per-channel stems. Exported VGMs play in the libvgm.wasm player and any other VGM player.</p>
+          <h2 class="name">Chip Tracker</h2>
+          <p class="desc">A music tracker built on the same libvgm.wasm engine, with one chip setup per game system: Mega Drive (six YM2612 FM channels with DAC drums, plus the SN76489), NES (two pulses with duty macros, triangle, noise and DPCM drums), Game Boy (pulses with hardware envelopes, a 4-bit wave channel, noise) and PC Engine (six HuC6280 wavetable channels). Each system gets its own screen theme and demo tune. Write patterns with the keyboard, the on-screen piano or a MIDI keyboard, record live into the pattern while it plays, then export VGM, WAV or per-channel stems that play in any VGM player.</p>
           <ul class="facts" aria-label="Build facts">
             <li>C/C++ → wasm32</li>
             <li>libvgm live API</li>
-            <li>YM2612 + SN76489</li>
+            <li>4 systems · 5 chips</li>
             <li>VGM · WAV · stems</li>
             <li>Web MIDI</li>
-            <li>v0.1.0 · 2026-11-05</li>
+            <li>v0.2.0 · 2026-11-05</li>
           </ul>
           <span class="play">Play →</span>
         </div>
