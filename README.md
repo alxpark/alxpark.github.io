@@ -24,7 +24,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Four Deep | `/four-deep/` | private repo `alxpark/four-deep` (`./build.sh` → `index.html`) |
 | 젬 바자르 | `/gem-bazaar/` | repo `alxpark/gem-bazaar` (`./build.sh` → `dist/index.html`) |
 | 샌드스톰 랠리 | `/sandstorm-rally/` | private repo `alxpark/sandstorm-rally` (`./build.sh` → `index.html`) |
-| Brass: Birmingham (비공식) | `/brass-birmingham/` | private repo `alxpark/brass-birmingham` (`./build.sh` → `dist/index.html`) |
+| Brass: Birmingham (unofficial) | `/brass-birmingham/` | private repo `alxpark/brass-birmingham` (`./build.sh` → `dist/index.html`) |
 | FM Chip Player | `/fm-chip-player/` | private repo `alxpark/fm-chip-player` (`./build.sh` → `dist/fm-chip-player.html`) |
 | YM2151 해부도 | `/ym2151-anatomy/` | private repo `alxpark/ym2151-anatomy` (`./build.sh` → `dist/ym2151-anatomy.html`) |
 
