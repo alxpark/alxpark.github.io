@@ -27,6 +27,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Brass: Birmingham (unofficial) | `/brass-birmingham/` | private repo `alxpark/brass-birmingham` (`./build.sh` → `dist/index.html`) |
 | FM Chip Player | `/fm-chip-player/` | private repo `alxpark/fm-chip-player` (`./build.sh` → `dist/fm-chip-player.html`) |
 | YM2151 해부도 | `/ym2151-anatomy/` | private repo `alxpark/ym2151-anatomy` (`./build.sh` → `dist/ym2151-anatomy.html`) |
+| K054539 Player | `/k054539-player/` | private repo `alxpark/k054539-player` (`make` → `docs/index.html`) |
 
 ## Adding an app
 
