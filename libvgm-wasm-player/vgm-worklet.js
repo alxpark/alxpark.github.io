@@ -42,7 +42,7 @@ class VGMProcessor extends AudioWorkletProcessor {
       if (this.off >= c.L.length) {
         this.q.shift();
         this.off = 0;
-        this.port.postMessage({ type: c.end ? "ended" : "played", t: c.t });
+        this.port.postMessage({ type: c.end ? "ended" : "played", t: c.t, f: c.f });
       }
     }
     if (i < L.length) { L.fill(0, i); R.fill(0, i); }
