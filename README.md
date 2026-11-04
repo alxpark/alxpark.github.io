@@ -22,7 +22,7 @@ Each app lives in its own folder as a self-contained `index.html` (the `.wasm` i
 | Darkroom Filter Lab | `/darkroom-filter-lab/` | private repo `alxpark/darkroom-filter-lab` (`./build.sh` → `dist/index.html`) |
 | Rust NES Workbench | `/nes/` | private repo `alxpark/nes-wasm` (`python3 web/bundle.py . --site` → `dist/index.html`) |
 | Four Deep | `/four-deep/` | private repo `alxpark/four-deep` (`./build.sh` → `index.html`) |
-| 젬 바자르 | `/gem-bazaar/` | repo `alxpark/gem-bazaar` (`./build.sh` → `dist/index.html`) |
+| Gem Bazaar (젬 바자르) | `/gem-bazaar/` | repo `alxpark/gem-bazaar` (`./build.sh` → `dist/index.html`) |
 | Sandstorm Rally (샌드스톰 랠리) | `/sandstorm-rally/` | private repo `alxpark/sandstorm-rally` (`./build.sh` → `index.html`) |
 | Brass: Birmingham (unofficial) | `/brass-birmingham/` | private repo `alxpark/brass-birmingham` (`./build.sh` → `dist/index.html`) |
 | FM Chip Player | `/fm-chip-player/` | private repo `alxpark/fm-chip-player` (`./build.sh` → `dist/fm-chip-player.html`) |
